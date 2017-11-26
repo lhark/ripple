@@ -4,7 +4,10 @@
 #include "constants.h"
 
 #include <iostream>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wint-in-bool-context"
 #include <Eigen/Dense>
+#pragma GCC diagnostic pop
 
 using namespace Eigen;
 using namespace std;

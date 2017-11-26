@@ -1994,6 +1994,9 @@ static GLfloat idata[12][3] =
    {-Z, -X, 0}
 };
 
+#undef X
+#undef Z
+
 static int connectivity[20][3] =
 {
    {0, 4, 1},

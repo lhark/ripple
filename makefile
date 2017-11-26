@@ -1,33 +1,54 @@
-CONTEXT=sdl2
-ifeq "$(shell uname)" "Darwin"
-    CONTEXT=glfw3
-    LDFLAGS += -lobjc -framework Foundation -framework OpenGL -framework Cocoa
-endif
+# Source http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 
-CXXFLAGS += -g -W -Wall -Wno-unused-parameter -Wno-deprecated-declarations
-CXXFLAGS += $(shell pkg-config --cflags glew)
-CXXFLAGS += $(shell pkg-config --cflags $(CONTEXT))
+SRCDIR := .
+#LIBDIR := ../nas2d-core/build/lib
+BUILDDIR := .
+OBJDIR := $(BUILDDIR)/obj
+DEPDIR := $(BUILDDIR)/deps
+#EXE := $(BINDIR)/OPHD
+EXE := ripple
 
-LDFLAGS += -g
-LDFLAGS += $(shell pkg-config --libs glew)
-LDFLAGS += $(shell pkg-config --libs $(CONTEXT))
+CFLAGS := -std=c++11 -g -Wall -Wno-unknown-pragmas -I/usr/include/glm -I/usr/include/eigen3 $(shell pkg-config --cflags glew)
+CFLAGS += $(shell pkg-config --cflags sdl2)
+LDFLAGS := -lstdc++ -lm -lglfw -lGLEW -lGL
+LDFLAGS += $(shell pkg-config --libs sdl2)
 
-TP="tp3"
-SRC=ripple
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
-exe : $(SRC).exe
-run : exe
-	optirun ./$(SRC).exe
-$(SRC).exe : $(SRC).cpp *.h
-	$(CXX) $(CXXFLAGS) -o$@ $(SRC).cpp $(LDFLAGS)
+COMPILE.cpp = $(CXX) $(DEPFLAGS) $(CFLAGS) $(TARGET_ARCH) -c
+POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
-sol :  ; make SRC=$(SRC)Solution exe
-runs : ; make SRC=$(SRC)Solution run
+SRCS := $(shell find $(SRCDIR) -name '*.cpp')
+OBJS := $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SRCS))
+OBJS := $(filter-out $(OBJDIR)/glm/% $(OBJDIR)/glew/% $(OBJDIR)/glfw/% $(OBJDIR)/ObjParser/Global% $(OBJDIR)/ObjParser/Main%,$(OBJS)) # Filter ui_builder
+FOLDERS := $(sort $(dir $(SRCS)))
 
-clean :
-	rm -rf *.o *.exe *.exe.dSYM
+all: $(EXE)
 
-remise zip :
-	make clean
-	rm -f remise_$(TP).zip
-	zip -r remise_$(TP).zip *.cpp *.h *.glsl makefile *.txt textures
+$(EXE): $(OBJS)
+	@mkdir -p ${@D}
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+$(OBJS): $(OBJDIR)/%.o : $(SRCDIR)/%.cpp $(DEPDIR)/%.d | build-folder
+	$(COMPILE.cpp) $(OUTPUT_OPTION) $<
+	$(POSTCOMPILE)
+
+.PHONY:build-folder
+build-folder:
+	@mkdir -p $(patsubst $(SRCDIR)/%,$(OBJDIR)/%, $(FOLDERS))
+	@mkdir -p $(patsubst $(SRCDIR)/%,$(DEPDIR)/%, $(FOLDERS))
+
+$(DEPDIR)/%.d: ;
+.PRECIOUS: $(DEPDIR)/%.d
+
+include $(wildcard $(patsubst $(SRCDIR)/%.cpp,$(DEPDIR)/%.d,$(SRCS)))
+
+.PHONY:clean, clean-deps, clean-all
+clean:
+	-rm -fr $(OBJDIR)
+	-rm -fr $(DEPDIR)
+	-rm -f $(EXE)
+clean-deps:
+	-rm -fr $(DEPDIR)
+clean-all:
+	-rm -rf $(BUILDDIR)

@@ -40,5 +40,6 @@
 #define WAVEMESH_HEIGHT_FACTOR 4	// the fine wave mesh compared to screen resolution
 #define AA_OVERSAMPLE_FACTOR 4		// anti aliasing applied in BOTH X and Y directions  {1,2,4,8}
 
-
-
+// UI consts
+#define MAX_PACKET_BUDGET 100000
+#define MIN_PACKET_BUDGET 1000

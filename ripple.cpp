@@ -1,10 +1,9 @@
-// Prénoms, noms et matricule des membres de l'équipe:
-// - Prénom1 NOM1 (matricule1)
-// - Prénom2 NOM2 (matricule2)
-
 #include <stdlib.h>
 #include <iostream>
 #include "inf2705.h"
+#include "constants.h"
+#include "FBO.h"
+#include "Packets.h"
 
 #define SOL 1
 
@@ -55,6 +54,14 @@ bool enPerspective = false;   // indique si on est en mode Perspective (true) ou
 bool enmouvement = false;     // le modèle est en mouvement/rotation automatique ou non
 bool afficheAxes = true;      // indique si on affiche les axes
 GLenum modePolygone = GL_FILL; // comment afficher les polygones
+
+// FBOs
+FBO *posFBO;
+FBO *heightFBO;
+FBO *aaFBO;
+
+// Wave Packets
+Packets *packets;
 
 ////////////////////////////////////////
 // déclaration des variables globales //
@@ -349,6 +356,11 @@ void initialiser()
    phiCam = 0.0;
    distCam = 30.0;
 
+   // Create FBOs
+   posFBO = new FBO();
+   heightFBO = new FBO();
+   aaFBO = new FBO();
+
    // couleur de l'arrière-plan
    glClearColor( 0.4, 0.2, 0.0, 1.0 );
 
@@ -463,6 +475,9 @@ void initialiser()
    tore = new FormeTore( 0.4, 0.8, 32, 32 );
    cylindre = new FormeCylindre( 0.3, 0.3, 3.0, 32, 32 );
    cone = new FormeCylindre( 0.0, 0.5, 3.0, 32, 32 );
+
+   // Update display mesh and FBOs
+   // redimensionner();
 }
 
 void conclure()
@@ -477,6 +492,9 @@ void conclure()
    delete tore;
    delete cylindre;
    delete cone;
+   delete posFBO;
+   delete heightFBO;
+   delete aaFBO;
 }
 
 void afficherModele()
@@ -529,7 +547,7 @@ void afficherModele()
          glBindVertexArray( 0 );
          break;
       case 2:
-         tore->afficher(); 
+         tore->afficher();
          break;
       case 3:
          sphere->afficher();
@@ -679,7 +697,16 @@ void FenetreTP::afficherScene()
 // fonction de redimensionnement de la fenêtre graphique
 void FenetreTP::redimensionner( GLsizei w, GLsizei h )
 {
+   std::cout << "Resizing to " << w << "×" << h << std::endl;
+   /* FIXME Is this function called on program start ? */
    glViewport( 0, 0, w, h );
+   /* TODO Create/resize display mesh */
+   posFBO->Liberer();
+   posFBO->Init(WAVETEX_WIDTH_FACTOR * w, WAVETEX_HEIGHT_FACTOR * h);
+   heightFBO->Liberer();
+   heightFBO->Init(WAVETEX_WIDTH_FACTOR * w, WAVETEX_HEIGHT_FACTOR * h);
+   aaFBO->Liberer();
+   aaFBO->Init(AA_OVERSAMPLE_FACTOR * w, AA_OVERSAMPLE_FACTOR * h);
 }
 
 static void echoEtats( )

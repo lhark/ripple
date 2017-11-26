@@ -1,16 +1,15 @@
 // taken from https://github.com/jeschke/water-wave-packets
 // Include the OS headers
 //-----------------------
-#include <windows.h>
-#include <atlbase.h>
-#include <strsafe.h>
 #include <string>
 #include <stdlib.h>
+#include <stdexcept>
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
-#include <math.h>
+#include <cmath>
 #include "Packets.h"
+#include "util.h"
 #pragma warning( disable: 4996 )
 
 
@@ -40,10 +39,10 @@ float Packets::GetIntersectionDistance(Vector2f pos1, Vector2f dir1, Vector2f po
 inline float Packets::GetGroundVal(Vector2f &p)
 {
 	Vector2f pTex = Vector2f(p.x()/SCENE_EXTENT+0.5f,p.y()/SCENE_EXTENT+0.5f);		// convert from world space to texture space
-	float val1 = m_ground[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	float val2 = m_ground[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
-	float val3 = m_ground[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	float val4 = m_ground[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	float val1 = m_ground[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	float val2 = m_ground[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	float val3 = m_ground[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	float val4 = m_ground[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
 	float xOffs = (pTex.x()*m_groundSizeX) - (int)(pTex.x()*m_groundSizeX);
 	float yOffs = (pTex.y()*m_groundSizeY) - (int)(pTex.y()*m_groundSizeY);
 	float valH1 = (1.0f-xOffs)*val1 + xOffs*val2;
@@ -54,10 +53,10 @@ inline float Packets::GetGroundVal(Vector2f &p)
 inline Vector2f Packets::GetGroundNormal(Vector2f &p)
 {
 	Vector2f pTex = Vector2f(p.x()/SCENE_EXTENT+0.5f,p.y()/SCENE_EXTENT+0.5f);		// convert from world space to texture space
-	Vector2f val1 = m_gndDeriv[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	Vector2f val2 = m_gndDeriv[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
-	Vector2f val3 = m_gndDeriv[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	Vector2f val4 = m_gndDeriv[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	Vector2f val1 = m_gndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	Vector2f val2 = m_gndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	Vector2f val3 = m_gndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	Vector2f val4 = m_gndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
 	float xOffs = (pTex.x()*m_groundSizeX) - (int)(pTex.x()*m_groundSizeX);
 	float yOffs = (pTex.y()*m_groundSizeY) - (int)(pTex.y()*m_groundSizeY);
 	Vector2f valH1 = (1.0f-xOffs)*val1 + xOffs*val2;
@@ -72,10 +71,10 @@ inline Vector2f Packets::GetGroundNormal(Vector2f &p)
 inline float Packets::GetBoundaryDist(Vector2f &p)
 {
 	Vector2f pTex = Vector2f(p.x()/SCENE_EXTENT+0.5f,p.y()/SCENE_EXTENT+0.5f);		// convert from world space to texture space
-	float val1 = m_distMap[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	float val2 = m_distMap[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
-	float val3 = m_distMap[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	float val4 = m_distMap[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	float val1 = m_distMap[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	float val2 = m_distMap[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	float val3 = m_distMap[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	float val4 = m_distMap[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
 	float xOffs = (pTex.x()*m_groundSizeX) - (int)(pTex.x()*m_groundSizeX);
 	float yOffs = (pTex.y()*m_groundSizeY) - (int)(pTex.y()*m_groundSizeY);
 	float valH1 = (1.0f-xOffs)*val1 + xOffs*val2;
@@ -86,10 +85,10 @@ inline float Packets::GetBoundaryDist(Vector2f &p)
 inline Vector2f Packets::GetBoundaryNormal(Vector2f &p)
 {
 	Vector2f pTex = Vector2f(p.x()/SCENE_EXTENT+0.5f,p.y()/SCENE_EXTENT+0.5f);		// convert from world space to texture space
-	Vector2f val1 = m_bndDeriv[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	Vector2f val2 = m_bndDeriv[(int)(max(0,min(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
-	Vector2f val3 = m_bndDeriv[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
-	Vector2f val4 = m_bndDeriv[(int)(max(0,min(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max(0,min(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	Vector2f val1 = m_bndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	Vector2f val2 = m_bndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
+	Vector2f val3 = m_bndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,pTex.x()*m_groundSizeX)))];
+	Vector2f val4 = m_bndDeriv[(int)(max<float>(0,min<float>(m_groundSizeY-1,1+pTex.y()*m_groundSizeY)))*m_groundSizeX + (int)(max<float>(0,min<float>(m_groundSizeX-1,1+pTex.x()*m_groundSizeX)))];
 	float xOffs = (pTex.x()*m_groundSizeX) - (int)(pTex.x()*m_groundSizeX);
 	float yOffs = (pTex.y()*m_groundSizeY) - (int)(pTex.y()*m_groundSizeY);
 	Vector2f valH1 = (1.0f-xOffs)*val1 + xOffs*val2;
@@ -108,42 +107,43 @@ inline Vector2f Packets::GetBoundaryNormal(Vector2f &p)
 #pragma warning( disable : 4996)
 Packets::Packets(int packetBudget)
 {
-	WCHAR wcInfo[512];
-
 	//load ground/boundary texture for CPU processing
-	LPCWSTR groundTexFile = WATER_TERRAIN_FILE;
-	tagBITMAPFILEHEADER bmpheader;
-	tagBITMAPINFOHEADER bmpinfo;
-	DWORD bytesread;
-	HANDLE file = CreateFile( groundTexFile , GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL );
-	if (file == NULL)
-	{
-		throw std::exception("Media file not found");
-		return;
+	char groundTexFile[] = WATER_TERRAIN_FILE;
+
+	/* https://stackoverflow.com/questions/9296059/read-pixel-value-in-bmp-file */
+	/* TODO Test bitmap reader implementation */
+	int i;
+	FILE* f = fopen(groundTexFile, "rb");
+	unsigned char info[54];
+
+	if (!f) {
+		die("Can't open terrain file");
 	}
-	if (   (ReadFile ( file, &bmpheader, sizeof ( BITMAPFILEHEADER ), &bytesread, NULL ) == false)
-		|| (ReadFile(file, &bmpinfo, sizeof(BITMAPINFOHEADER), &bytesread, NULL) == false)
-		|| (bmpheader.bfType != 'MB')
-		|| (bmpinfo.biCompression != BI_RGB)
-		|| (bmpinfo.biBitCount != 24) )
-	{
-		CloseHandle ( file );
-		throw std::exception("Error reading media file");
-		return;
+	fread(info, sizeof(unsigned char), 54, f); // read the 54-byte header
+
+	// extract image height and width from header
+	auto fileSize = *reinterpret_cast<uint32_t *>(&info[2]);
+	auto dataOffset = *reinterpret_cast<uint32_t *>(&info[10]);
+	auto width = *reinterpret_cast<uint32_t *>(&info[18]);
+	auto height = *reinterpret_cast<uint32_t *>(&info[22]);
+	auto depth = *reinterpret_cast<uint16_t *>(&info[28]);
+
+	if (info[0] != 'B' || info[1] != 'M') {
+		fclose(f);
+		die("Incorrect bitmap header will loading terrain file");
 	}
-	m_groundSizeX  = abs(bmpinfo.biWidth);
-	m_groundSizeY  = abs(bmpinfo.biHeight);
-	long size = bmpheader.bfSize-bmpheader.bfOffBits;
-	SetFilePointer ( file, bmpheader.bfOffBits, NULL, FILE_BEGIN );
-	BYTE* Buffer = new BYTE[size];
-	if ( ReadFile ( file, Buffer, size, &bytesread, NULL ) == false )
-	{
-		delete[](Buffer);
-		CloseHandle(file);
-		throw std::exception("Media file not found");
-		return;
+	if (depth != 24) {
+		fclose(f);
+		die("Incorrect color depth for terrain file");
 	}
-	CloseHandle(file);
+
+	m_groundSizeX  = abs<int>(width);
+	m_groundSizeY  = abs<int>(height);
+	long size = fileSize - dataOffset;
+	unsigned char* Buffer = new unsigned char[size]; // allocate 3 bytes per pixel
+	fread(Buffer, sizeof(unsigned char), size, f); // read the rest of the data at once
+	fclose(f);
+
 	// convert read buffer to our rgb datastructure
 	int padding = 0;
 	int scanlinebytes = m_groundSizeX*3;
@@ -167,8 +167,7 @@ Packets::Packets(int packetBudget)
 
 	// boundary texture distance transform
 	// init helper distance map (pMap)
-	StringCchPrintf(wcInfo, 512, L"Computing boundary distance transform..");
-	OutputDebugString(wcInfo);
+	printf("Computing boundary distance transform..");
 	int *pMap = new int[m_groundSizeX*m_groundSizeY];
 	#pragma omp parallel for
 	for (int y = 0; y < m_groundSizeY; y++)
@@ -176,16 +175,16 @@ Packets::Packets(int packetBudget)
 		{
 			// if we are at the boundary, intialize the distance function with 0, otherwise with maximum value
 			if ((bound[y*m_groundSizeX + x] > 0.5f) &&
-				((bound[max(0, min(m_groundSizeY - 1, y + 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] <= 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 1))] <= 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y - 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] <= 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x - 1))] <= 0.5f)))
+				((bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] <= 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 1))] <= 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y - 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] <= 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x - 1))] <= 0.5f)))
 				pMap[y*m_groundSizeX + x] = 0;  // initialize with maximum x distance
 			else if ((bound[y*m_groundSizeX + x] <= 0.5f) &&
-				((bound[max(0, min(m_groundSizeY - 1, y + 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] > 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 1))] > 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y - 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] > 0.5f)
-					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x - 1))] > 0.5f)))
+				((bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] > 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 1))] > 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y - 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] > 0.5f)
+					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x - 1))] > 0.5f)))
 				pMap[y*m_groundSizeX + x] = 0;  // initialize with maximum x distance
 			else
 				pMap[y*m_groundSizeX + x] = m_groundSizeX*m_groundSizeX;  // initialize with maximum x distance
@@ -203,7 +202,7 @@ Packets::Packets(int packetBudget)
 		{
 			if (pMap[y*m_groundSizeX+x] == 0)
 				lastBoundX = x;
-			pMap[y*m_groundSizeX+x] = min(pMap[y*m_groundSizeX+x], (x-lastBoundX)*(x-lastBoundX));
+			pMap[y*m_groundSizeX+x] = min<float>(pMap[y*m_groundSizeX+x], (x-lastBoundX)*(x-lastBoundX));
 		}
 	}
 	#pragma omp parallel for
@@ -214,7 +213,7 @@ Packets::Packets(int packetBudget)
 		{
 			if (pMap[y*m_groundSizeX+x] == 0)
 				lastBoundX = x;
-			pMap[y*m_groundSizeX+x] = min(pMap[y*m_groundSizeX+x], (lastBoundX-x)*(lastBoundX-x));
+			pMap[y*m_groundSizeX+x] = min<float>(pMap[y*m_groundSizeX+x], (lastBoundX-x)*(lastBoundX-x));
 		}
 	}
 	#pragma omp parallel for
@@ -224,13 +223,13 @@ Packets::Packets(int packetBudget)
 			int minDist = pMap[y*m_groundSizeX+x];
 			for (int yd=1; yd+y<=m_groundSizeY-1; yd++)
 			{
-				minDist = min(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
+				minDist = min<float>(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
 				if (minDist < yd*yd)
 					break;
 			}
 			for (int yd=-1; yd+y>=0; yd--)
 			{
-				minDist = min(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
+				minDist = min<float>(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
 				if (minDist < yd*yd)
 					break;
 			}
@@ -247,33 +246,29 @@ Packets::Packets(int packetBudget)
 				m_distMap[y*m_groundSizeX+x] = -m_distMap[y*m_groundSizeX+x];		// negative distance INSIDE a boundary regions
 			m_distMap[y*m_groundSizeX+x] = m_distMap[y*m_groundSizeX+x]*SCENE_EXTENT / m_groundSizeX;
 		}
-	StringCchPrintf(wcInfo, 512, L"done!\n");
-	OutputDebugString(wcInfo);
+	printf("done!\n");
 
 	// derivative (2D normal) of the boundary texture
-	StringCchPrintf( wcInfo, 512, L"Computing boundary derivatives..");
-	OutputDebugString( wcInfo );
+	printf("Computing boundary derivatives..");
 	m_bndDeriv = new Vector2f[m_groundSizeX*m_groundSizeY];
 	#pragma omp parallel for
 	for (int y=0; y<m_groundSizeY; y++)
 		for (int x=0; x<m_groundSizeX; x++)
 		{
-			float dx = m_distMap[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x+1))] - m_distMap[y*m_groundSizeX + x];
-			float dy = m_distMap[max(0,min(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + x];
+			float dx = m_distMap[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+1))] - m_distMap[y*m_groundSizeX + x];
+			float dy = m_distMap[max<int>(0,min<float>(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + x];
 			Vector2f dV = Vector2f(dx,dy);
-			dx = m_distMap[y*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x-1))];
-			dy = m_distMap[y*m_groundSizeX + x] - m_distMap[max(0,min(m_groundSizeY-1,y-1))*m_groundSizeX + x];
+			dx = m_distMap[y*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x-1))];
+			dy = m_distMap[y*m_groundSizeX + x] - m_distMap[max<int>(0,min<float>(m_groundSizeY-1,y-1))*m_groundSizeX + x];
 			dV += Vector2f(dx,dy);
 			m_bndDeriv[y*m_groundSizeX+x] = Vector2f(0,0);
 			if ((dV.x() != 0) || (dV.y() != 0))
 				m_bndDeriv[y*m_groundSizeX+x] = dV.normalized();
 		}
-	StringCchPrintf( wcInfo, 512, L"done!\n");
-	OutputDebugString( wcInfo );
+	printf("done!\n");
 
 	//smooth the derivative to avoid staricase artifacts of the texture
-	StringCchPrintf( wcInfo, 512, L"Smoothing boundary derivatives..");
-	OutputDebugString( wcInfo );
+	printf("Smoothing boundary derivatives..");
 	Vector2f *m_bndDerivH = new Vector2f[m_groundSizeX*m_groundSizeY];
 	for (int i=0; i<2; i++)  //15
 	{
@@ -290,7 +285,7 @@ Packets::Packets(int packetBudget)
 								w = 4.0/16.0;
 							else if ((abs(dy) == 0) || (abs(dx) == 0))
 								w = 2.0/16.0;
-							dV += w*m_bndDeriv[max(0,min(m_groundSizeY-1,y+dy))*m_groundSizeX + max(0,min(m_groundSizeX-1,x+dx))];
+							dV += w*m_bndDeriv[max<int>(0,min<float>(m_groundSizeY-1,y+dy))*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+dx))];
 						}
 				if ((dV.x() != 0) || (dV.y() != 0))
 					m_bndDerivH[y*m_groundSizeX+x] = dV.normalized();
@@ -299,29 +294,26 @@ Packets::Packets(int packetBudget)
 		memcpy(m_bndDeriv, m_bndDerivH, sizeof(Vector2f)*m_groundSizeX*m_groundSizeY);
 	}
 	delete[](m_bndDerivH);
-	StringCchPrintf( wcInfo, 512, L"done!\n");
-	OutputDebugString( wcInfo );
+	printf("done!\n");
 
 	// derivative (2D normal) of the ground texture
-	StringCchPrintf( wcInfo, 512, L"Computing ground derivatives..");
-	OutputDebugString( wcInfo );
+	printf("Computing ground derivatives..");
 	m_gndDeriv = new Vector2f[m_groundSizeX*m_groundSizeY];
 	#pragma omp parallel for
 	for (int y=0; y<m_groundSizeY; y++)
 		for (int x=0; x<m_groundSizeX; x++)
 		{
-			float dx = m_ground[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x+1))] - m_ground[y*m_groundSizeX + x];
-			float dy = m_ground[max(0,min(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_ground[y*m_groundSizeX + x];
+			float dx = m_ground[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+1))] - m_ground[y*m_groundSizeX + x];
+			float dy = m_ground[max<int>(0,min<float>(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_ground[y*m_groundSizeX + x];
 			Vector2f dV = Vector2f(dx,dy);
-			dx = m_ground[y*m_groundSizeX + x] - m_ground[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x-1))];
-			dy = m_ground[y*m_groundSizeX + x] - m_ground[max(0,min(m_groundSizeY-1,y-1))*m_groundSizeX + x];
+			dx = m_ground[y*m_groundSizeX + x] - m_ground[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x-1))];
+			dy = m_ground[y*m_groundSizeX + x] - m_ground[max<int>(0,min<float>(m_groundSizeY-1,y-1))*m_groundSizeX + x];
 			dV += Vector2f(dx,dy);
 			m_gndDeriv[y*m_groundSizeX+x] = Vector2f(0,0);
 			if ((dV.x() != 0) || (dV.y() != 0))
 				m_gndDeriv[y*m_groundSizeX+x] = dV.normalized();
 		}
-	StringCchPrintf( wcInfo, 512, L"done!\n");
-	OutputDebugString( wcInfo );
+	printf("done!\n");
 
 	// init variables
 	m_packetBudget = packetBudget;
@@ -381,9 +373,7 @@ void Packets::ExpandWavePacketMemory(int targetNum)
 {
 	if (targetNum < m_packetNum)	// this should never happen
 		return;
-	WCHAR wcFileInfo[512];
-	StringCchPrintf(wcFileInfo, 512, L"(INFO): Expanding packet memory from %i to %i packets (%i MB).\n", m_packetNum, targetNum, (targetNum)*(sizeof(WAVE_PACKET) + sizeof(GHOST_PACKET) + 4 * sizeof(int)) / (1024 * 1024));
-	OutputDebugString(wcFileInfo);
+	printf("(INFO): Expanding packet memory from %i to %i packets (%i MB).\n", m_packetNum, targetNum, (targetNum)*(sizeof(WAVE_PACKET) + sizeof(GHOST_PACKET) + 4 * sizeof(int)) / (1024 * 1024));
 	WAVE_PACKET *p = new WAVE_PACKET[targetNum];
 	GHOST_PACKET *pG = new GHOST_PACKET[targetNum];
 	int *uP = new int[targetNum];
@@ -487,8 +477,8 @@ void Packets::DeleteGhost(int id)
 void Packets::CreatePacket(float pos1x, float pos1y, float pos2x, float pos2y, float dir1x, float dir1y, float dir2x, float dir2y, float k_L, float k_H, float E)
 {
 	// make sure we have enough memory
-	if ( max(m_usedPackets, m_usedGhosts) + 10 > m_packetNum)
-		ExpandWavePacketMemory(max(m_usedPackets,m_usedGhosts) + PACKET_BUFFER_DELTA);
+	if ( max<float>(m_usedPackets, m_usedGhosts) + 10 > m_packetNum)
+		ExpandWavePacketMemory(max<float>(m_usedPackets,m_usedGhosts) + PACKET_BUFFER_DELTA);
 	float speedDummy, kDummy;
 	int	firstfree = GetFreePackedID();
 	m_packet[firstfree].pos1 =  Vector2f(pos1x,pos1y);
@@ -522,9 +512,9 @@ void Packets::CreatePacket(float pos1x, float pos1y, float pos2x, float pos2y, f
 	m_packet[firstfree].sOld1 = m_packet[firstfree].speed1;
 	GetWaveParameters(GetWaterDepth(m_packet[firstfree].pos2), m_packet[firstfree].w0, m_packet[firstfree].k, kDummy, m_packet[firstfree].speed2);
 	m_packet[firstfree].sOld2 = m_packet[firstfree].speed2;
-	m_packet[firstfree].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k)); // adjust envelope size to represented wavelength
+	m_packet[firstfree].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k)); // adjust envelope size to represented wavelength
 	m_packet[firstfree].ampOld = 0.0;
-	float a1 = min(MAX_SPEEDNESS*2.0f*M_PI / m_packet[firstfree].k, GetWaveAmplitude(m_packet[firstfree].envelope*(m_packet[firstfree].pos1 - m_packet[firstfree].pos2).norm(), m_packet[firstfree].E, m_packet[firstfree].k));
+	float a1 = min<float>(MAX_SPEEDNESS*2.0f*M_PI / m_packet[firstfree].k, GetWaveAmplitude(m_packet[firstfree].envelope*(m_packet[firstfree].pos1 - m_packet[firstfree].pos2).norm(), m_packet[firstfree].E, m_packet[firstfree].k));
 	m_packet[firstfree].dAmp = 0.5f*(m_packet[firstfree].speed1+m_packet[firstfree].speed2)*m_elapsedTime/(PACKET_BLEND_TRAVEL_FACTOR*m_packet[firstfree].envelope)*a1;
 
 	// Test for wave number splitting -> if the packet interval crosses the slowest waves, divide so that each part has a monotonic speed function (assumed for travel spread/error calculation)
@@ -541,9 +531,9 @@ void Packets::CreatePacket(float pos1x, float pos1y, float pos2x, float pos2y, f
 		m_packet[firstfree].k = 0.5f*(m_packet[firstfree].k_L+m_packet[firstfree].k_H);
 		GetWaveParameters(wd, m_packet[firstfree].w0, m_packet[firstfree].k, m_packet[firstfree].k, m_packet[firstfree].speed1);
 		m_packet[firstfree].speed2 = m_packet[firstfree].speed1;
-		m_packet[firstfree].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k)); // adjust envelope size to represented wavelength
+		m_packet[firstfree].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k)); // adjust envelope size to represented wavelength
 		m_packet[firstfree].ampOld = 0.0;
-		a1 = min(MAX_SPEEDNESS*2.0f*M_PI / m_packet[firstfree].k, GetWaveAmplitude(m_packet[firstfree].envelope*(m_packet[firstfree].pos1 - m_packet[firstfree].pos2).norm(), m_packet[firstfree].E, m_packet[firstfree].k));
+		a1 = min<float>(MAX_SPEEDNESS*2.0f*M_PI / m_packet[firstfree].k, GetWaveAmplitude(m_packet[firstfree].envelope*(m_packet[firstfree].pos1 - m_packet[firstfree].pos2).norm(), m_packet[firstfree].E, m_packet[firstfree].k));
 		m_packet[firstfree].dAmp = 0.5f*(m_packet[firstfree].speed1 + m_packet[firstfree].speed2)*m_elapsedTime / (PACKET_BLEND_TRAVEL_FACTOR*m_packet[firstfree].envelope)*a1;
 		// also adjust freq. interval and envelope size of existing wave
 		m_packet[i1].k_H = PACKET_SLOWAVE_K;
@@ -553,9 +543,9 @@ void Packets::CreatePacket(float pos1x, float pos1y, float pos2x, float pos2y, f
 		m_packet[i1].k = 0.5f*(m_packet[i1].k_L+m_packet[i1].k_H);
 		GetWaveParameters(wd, m_packet[i1].w0, m_packet[i1].k, m_packet[i1].k, m_packet[i1].speed1);
 		m_packet[i1].speed2 = m_packet[i1].speed1;
-		m_packet[i1].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k)); // adjust envelope size to represented wavelength
+		m_packet[i1].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k)); // adjust envelope size to represented wavelength
 		m_packet[i1].ampOld = 0.0f;
-		a1 = min(MAX_SPEEDNESS*2.0f*M_PI / m_packet[i1].k, GetWaveAmplitude(m_packet[i1].envelope*(m_packet[i1].pos1 - m_packet[i1].pos2).norm(), m_packet[i1].E, m_packet[i1].k));
+		a1 = min<float>(MAX_SPEEDNESS*2.0f*M_PI / m_packet[i1].k, GetWaveAmplitude(m_packet[i1].envelope*(m_packet[i1].pos1 - m_packet[i1].pos2).norm(), m_packet[i1].E, m_packet[i1].k));
 		m_packet[i1].dAmp = 0.5f*(m_packet[i1].speed1 + m_packet[i1].speed2)*m_elapsedTime / (PACKET_BLEND_TRAVEL_FACTOR*m_packet[i1].envelope)*a1;
 	}
 }
@@ -591,7 +581,7 @@ void Packets::CreateSpreadingPacket(float xPos, float yPos, float dirx, float di
 void Packets::CreateCircularWavefront(float xPos, float yPos, float radius, float lambda_L, float lambda_H, float E)
 {
 	// adapt initial packet crestlength to impact radius and wavelength
-	float dAng = min(24.0f, 360.0f * ((0.5f*lambda_L + 0.5f*lambda_H)*3.0f) / (2.0f*M_PI*radius));
+	float dAng = min<float>(24.0f, 360.0f * ((0.5f*lambda_L + 0.5f*lambda_H)*3.0f) / (2.0f*M_PI*radius));
 	for (float i = 0; i < 360.0f; i += dAng)
 		CreatePacket(
 			xPos + radius*sin(i*M_PI / 180.0f), yPos + radius*cos(i*M_PI / 180.0f),
@@ -687,7 +677,7 @@ bool Packets::AdvectPacketVertex(float elapsedTime, Vector2f &posIn,  Vector2f &
 		GetWaveParameters(GetWaterDepth(pNext), w0, kIn, k, speed2);
 
 		float cos1 = nDir.dot(-dirIn);
-		float cos2 = sqrt( max(0.0f, 1.0f - (speed2*speed2)/(speed1*speed1)*(1.0f - cos1*cos1) ));
+		float cos2 = sqrt( max<float>(0.0f, 1.0f - (speed2*speed2)/(speed1*speed1)*(1.0f - cos1*cos1) ));
 		Vector2f nRefrac;
 		if (cos1 <= 0.0f)
 			nRefrac = speed2/speed1*dirIn + (speed2/speed1*cos1 + cos2)*nDir;
@@ -867,7 +857,7 @@ void Packets::AdvectWavePackets(float dTime)
 				GetWaveParameters(wd, m_packet[i1].w0_H, m_packet[i1].k_H, m_packet[i1].k_H, dummySpeed);
 				GetWaveParameters(wd, m_packet[i1].w0, 0.5f*(m_packet[i1].k_L+m_packet[i1].k_H), m_packet[i1].k, dummySpeed);
 				m_packet[i1].d_L = 0.0; m_packet[i1].d_H = 0.0; // reset the internally tracked error
-				m_packet[i1].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k));
+				m_packet[i1].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k));
 			}
 			//if both vertices bounced, the reflected wave needs to smoothly reappear
 			if (m_packet[i1].bounced1==m_packet[i1].bounced2)
@@ -967,8 +957,8 @@ void Packets::AdvectWavePackets(float dTime)
 
 
 	// wavenumber interval subdivision if travel distance between fastest and slowest wave packets differ more than PACKET_SPLIT_DISPERSION x envelope size
-	if ( max(m_usedGhosts + m_usedPackets, 2*m_usedPackets) > m_packetNum)
-		ExpandWavePacketMemory(max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
+	if ( max<float>(m_usedGhosts + m_usedPackets, 2*m_usedPackets) > m_packetNum)
+		ExpandWavePacketMemory(max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
 	#pragma omp parallel for
 	for (int uP = m_usedPackets-1; uP>=0; uP--)
 		if (!m_packet[m_usedPacket[uP]].use3rd)
@@ -1016,7 +1006,7 @@ void Packets::AdvectWavePackets(float dTime)
 				float d_All = m_packet[i1].d_L;
 				m_packet[firstfree].d_L = dSL*d_All / (dSH + dSL);
 				m_packet[firstfree].d_H = d_All - m_packet[firstfree].d_L;
-				m_packet[firstfree].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k));
+				m_packet[firstfree].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[firstfree].k));
 				// set the new upper freq. boundary and representative freq.
 				m_packet[i1].k_L = m_packet[i1].k;
 				m_packet[i1].w0_L = m_packet[i1].w0;
@@ -1030,7 +1020,7 @@ void Packets::AdvectWavePackets(float dTime)
 				d_All = m_packet[i1].d_H;
 				m_packet[i1].d_L = dSL*d_All / (dSH + dSL);
 				m_packet[i1].d_H = d_All - m_packet[i1].d_L;
-				m_packet[i1].envelope = min(PACKET_ENVELOPE_MAXSIZE, max(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k));
+				m_packet[i1].envelope = min<float>(PACKET_ENVELOPE_MAXSIZE, max<float>(PACKET_ENVELOPE_MINSIZE, PACKET_ENVELOPE_SIZE_FACTOR*2.0f*M_PI/m_packet[i1].k));
 				// distribute the energy such that both max. wave gradients are equal -> both get the same wave shape
 				m_packet[firstfree].E = abs(m_packet[i1].E)/(1.0f + (m_packet[i1].envelope*m_packet[firstfree].k*m_packet[firstfree].k*(DENSITY*GRAVITY+SIGMA*m_packet[i1].k*m_packet[i1].k))/(m_packet[firstfree].envelope*m_packet[i1].k*m_packet[i1].k*(DENSITY*GRAVITY+SIGMA*m_packet[firstfree].k*m_packet[firstfree].k)));
 				m_packet[i1].E = abs(m_packet[i1].E)-m_packet[firstfree].E;
@@ -1046,8 +1036,8 @@ void Packets::AdvectWavePackets(float dTime)
 
 
 	// crest-refinement of packets of regular packet (not at any boundary, i.e. having no 3rd vertex)
-	if (max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) > m_packetNum)
-		ExpandWavePacketMemory(max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
+	if (max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) > m_packetNum)
+		ExpandWavePacketMemory(max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
 	#pragma omp parallel for
 	for (int uP = m_usedPackets-1; uP>=0; uP--)
 		if (!m_packet[m_usedPacket[uP]].use3rd)
@@ -1195,7 +1185,7 @@ void Packets::AdvectWavePackets(float dTime)
 	}
 
 	// damping, insignificant packet removal (if too low amplitude), reduce energy of steep waves with too high gradient
-	m_softDampFactor = 1.0f + 100.0f*pow(max(0.0f, (float)(m_usedPackets)/(float)(m_packetBudget) - 1.0f), 2.0f);
+	m_softDampFactor = 1.0f + 100.0f*pow(max<float>(0.0f, (float)(m_usedPackets)/(float)(m_packetBudget) - 1.0f), 2.0f);
 	#pragma omp parallel for
 	for (int uP = 0; uP < m_usedPackets; uP++)
 		if ((!m_packet[m_usedPacket[uP]].use3rd) && (!m_packet[m_usedPacket[uP]].toDelete))
@@ -1231,7 +1221,7 @@ void Packets::AdvectWavePackets(float dTime)
 					m_packet[i1].E = a1*a1*(area*0.5f*(DENSITY*GRAVITY + SIGMA*k*k));
 				}
 			}
-			m_packet[i1].ampOld = min(a1, m_packet[i1].ampOld + m_packet[i1].dAmp); // smoothly increase amplitude from last timestep
+			m_packet[i1].ampOld = min<float>(a1, m_packet[i1].ampOld + m_packet[i1].dAmp); // smoothly increase amplitude from last timestep
 			// update variables needed for packet display
 			Vector2f posMidNew = 0.5f*(m_packet[i1].pos1 + m_packet[i1].pos2);
 			Vector2f posMidOld = 0.5f*(m_packet[i1].pOld1 + m_packet[i1].pOld2);
@@ -1252,7 +1242,7 @@ void Packets::AdvectWavePackets(float dTime)
 		int i1 = m_usedGhost[uG];
 		m_ghostPacket[i1].pos += m_elapsedTime*m_ghostPacket[i1].speed*m_ghostPacket[i1].dir;
 		m_ghostPacket[i1].phase += m_ghostPacket[i1].dPhase;
-		m_ghostPacket[i1].ampOld = max(0.0f, m_ghostPacket[i1].ampOld - m_softDampFactor*m_ghostPacket[i1].dAmp);  // decrease amplitude to let this wave disappear (take budget-based softdamping into account)
+		m_ghostPacket[i1].ampOld = max<float>(0.0f, m_ghostPacket[i1].ampOld - m_softDampFactor*m_ghostPacket[i1].dAmp);  // decrease amplitude to let this wave disappear (take budget-based softdamping into account)
 	}
 	// delete all ghost packets if they traveled long enough (important: NO parallelization here!)
 	for (int uG = 0; uG < m_usedGhosts; uG++)
