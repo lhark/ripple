@@ -92,7 +92,7 @@ void FBO::Init( int w, int h )
    glBindTexture(m_Target, m_Texture);
    glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
    glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-   glTexImage2D(m_Target, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+   glTexImage2D(m_Target, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
    // Créer une texture de profondeurs pour les couleurs avec L'ID m_Profondeur:
    glGenTextures(1, &m_Profondeur);

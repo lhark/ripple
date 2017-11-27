@@ -7,8 +7,16 @@
 
 #define SOL 1
 
+enum {LocAttrib, LocUniform}; /* Shader location type */
+
 // variables pour l'utilisation des nuanceurs
 GLuint prog;      // votre programme de nuanceurs
+GLuint progRasterizeWaveMeshPosition;
+GLuint progAddPacketDisplacement;
+GLuint progDisplayPacketOutlined;
+GLuint progDisplayMicroMesh;
+GLuint progDisplayTerrain;
+GLuint progRenderAA;
 GLint locVertex = -1;
 GLint locNormal = -1;
 GLint locTexCoord = -1;
@@ -17,6 +25,50 @@ GLint locmatrVisu = -1;
 GLint locmatrProj = -1;
 GLint locmatrNormale = -1;
 GLint loclaTexture = -1;
+// Locations for RasterizeWaveMeshPosition shader
+GLint locVertexRWMP = -1;
+GLint locTexCoordRWMP = -1;
+GLint locmatrModelRWMP = -1;
+GLint locmatrVisuRWMP = -1;
+GLint locmatrProjRWMP = -1;
+GLint locmatrNormaleRWMP = -1;
+GLint locTexRWMP = -1;
+// Locations for AddPacketDisplacement shader
+GLuint locVertexADP = -1;
+GLuint locTexCoordADP = -1;
+GLuint locmatrModelADP = -1;
+GLuint locmatrVisuADP = -1;
+GLuint locmatrProjADP = -1;
+GLuint locTexADP = -1;
+// Locations for DisplayPacketOutlined shader
+GLuint locVertexDPO = -1;
+GLuint locTexCoordDPO = -1;
+GLuint locmatrModelDPO = -1;
+GLuint locmatrVisuDPO = -1;
+GLuint locmatrProjDPO = -1;
+GLuint locTexDPO = -1;
+// Locations for DisplayMicroMesh shader
+GLuint locVertexDMM = -1;
+GLuint locTexCoordDMM = -1;
+GLuint locmatrModelDMM = -1;
+GLuint locmatrVisuDMM = -1;
+GLuint locmatrProjDMM = -1;
+GLuint locTexDMM = -1;
+// Locationss for DisplayTerrain shader
+GLuint locVertexDT = -1;
+GLuint locTexCoordDT = -1;
+GLuint locmatrModelDT = -1;
+GLuint locmatrVisuDT = -1;
+GLuint locmatrProjDT = -1;
+GLuint locTexDT = -1;
+// Locations for RenderAA shader
+GLuint locVertexRAA = -1;
+GLuint locTexCoordRAA = -1;
+GLuint locmatrModelRAA = -1;
+GLuint locmatrVisuRAA = -1;
+GLuint locmatrProjRAA = -1;
+GLuint locTexRAA = -1;
+
 GLuint indLightSource;
 GLuint indFrontMaterial;
 GLuint indLightModel;
@@ -29,6 +81,8 @@ GLint locmatrVisuBase = -1;
 GLint locmatrProjBase = -1;
 
 GLuint vao[2];
+GLuint vaoQuad;
+GLuint vbosQuad[2];
 GLuint vbo[5];
 GLuint ubo[4];
 
@@ -62,6 +116,12 @@ FBO *aaFBO;
 
 // Wave Packets
 Packets *packets;
+int packetBudget = MIN_PACKET_BUDGET;
+/* Wave packets:
+ * vec4: xy = position, zw = direction
+ * vec4: x = amplitude, y = wavelength, z = phase offset, w = enveloppe size
+ * vec4: for rendering x = center of wave bending circle*/
+GLfloat packetData[PACKET_GPU_BUFFER_SIZE * 3 * 4];
 
 ////////////////////////////////////////
 // déclaration des variables globales //
@@ -71,7 +131,7 @@ Packets *packets;
 int modele = 1;                  // le modèle à afficher
 
 // partie 3: texture
-GLuint textureDE = 0;
+GLuint texTerrain = 0;
 GLuint textureECHIQUIER = 0;
 
 // définition des lumières
@@ -165,13 +225,6 @@ void calculerPhysique( )
       if ( LightSource[0].spotAngle < 5.0 ) sensAngle = -sensAngle;
       if ( LightSource[0].spotAngle > 60.0 ) sensAngle = -sensAngle;
 
-#if 0
-      static int sensExposant = 1;
-      LightSource[0].spotExposant += sensExposant * 0.3;
-      if ( LightSource[0].spotExposant < 1.0 ) sensExposant = -sensExposant;
-      if ( LightSource[0].spotExposant > 10.0 ) sensExposant = -sensExposant;
-#endif
-
       // De temps à autre, alterner entre le modèle d'illumination: Lambert, Gouraud, Phong
       static float type = 0;
       type += 0.005;
@@ -181,32 +234,141 @@ void calculerPhysique( )
    verifierAngles();
 }
 
+
+void updatePackets()
+{
+    // Compute wave packets
+    packets->AdvectWavePackets(INIT_WAVE_SPEED);
+
+    // TODO Setup wide projection for InitiateWaveField (RasterizeWaveMeshPosition)
+
+    int displayedPackets = 0;
+    int packetChunk =0;
+    /* Standard wave packets */
+    for (int i = 0; i < packets->m_usedPackets; ++i) {
+        int pk = packets->m_usedPacket[i];
+        /* Test for 3rd vertex (sliding point) */
+        if (!packets->m_packet[pk].use3rd) {
+            /* Position */
+            packetData[packetChunk++] = packets->m_packet[pk].midPos.x();
+            packetData[packetChunk++] = packets->m_packet[pk].midPos.y();
+            /* Direction */
+            packetData[packetChunk++] = packets->m_packet[pk].travelDir.x();
+            packetData[packetChunk++] = packets->m_packet[pk].travelDir.y();
+            /* Att1 */
+            packetData[packetChunk++] = packets->m_packet[pk].ampOld;
+            packetData[packetChunk++] = 2.0f * M_PI / packets->m_packet[pk].k;
+            packetData[packetChunk++] = packets->m_packet[pk].phase;
+            packetData[packetChunk++] = packets->m_packet[pk].envelope;
+            /* Att2 */
+            packetData[packetChunk++] = packets->m_packet[pk].bending;
+            packetChunk += 3; /* The last 3 elements aren't needed */
+            displayedPackets++;
+            if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
+                /* TODO Update VBO */
+                /* TODO EvaluatePackets(packetChunk) */
+                packetChunk = 0;
+            }
+        }
+    }
+    /* Ghost packets */
+    for (int i = 0; i < packets->m_usedGhosts; ++i) {
+        int pk = packets->m_usedGhost[i];
+        /* Position */
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].pos.x();
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].pos.y();
+        /* Direction */
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].dir.x();
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].dir.y();
+        /* Att1 */
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].ampOld;
+        packetData[packetChunk++] = 2.0f * M_PI / packets->m_ghostPacket[pk].k;
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].phase;
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].envelope;
+        /* Att2 */
+        packetData[packetChunk++] = packets->m_ghostPacket[pk].bending;
+        packetChunk += 3; /* The last 3 elements aren't needed */
+        displayedPackets++;
+        if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
+            /* TODO Update VBO */
+            /* TODO EvaluatePackets(packetChunk) */
+            packetChunk = 0;
+        }
+    }
+    /* TODO Update VBO */
+    /* TODO EvaluatePackets(packetChunk) */
+    /* TODO DisplayScene */
+    /* TODO Get camera center */
+}
+
+
 void chargerTextures()
 {
    unsigned char *pixels;
    GLsizei largeur, hauteur;
-   if ( ( pixels = ChargerImage( "textures/de.bmp", largeur, hauteur ) ) != NULL )
+   if ( ( pixels = ChargerImage( WATER_TERRAIN_FILE, largeur, hauteur ) ) != NULL )
    {
-      glGenTextures( 1, &textureDE );
-      glBindTexture( GL_TEXTURE_2D, textureDE );
-      glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, largeur, hauteur, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
-      glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-      glBindTexture( GL_TEXTURE_2D, 0 );
-      delete[] pixels;
-   }
-   if ( ( pixels = ChargerImage( "textures/echiquier.bmp", largeur, hauteur ) ) != NULL )
-   {
-      glGenTextures( 1, &textureECHIQUIER );
-      glBindTexture( GL_TEXTURE_2D, textureECHIQUIER );
+      glGenTextures( 1, &texTerrain );
+      glBindTexture( GL_TEXTURE_2D, texTerrain );
       glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, largeur, hauteur, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
       glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
       glBindTexture( GL_TEXTURE_2D, 0 );
       delete[] pixels;
    }
 
-   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
 }
+
+
+/* Create program and link it
+ * Input : filenames for vertex, geometry and fragment shader, or NULL*/
+GLuint createShader(const GLchar *shaders[3])
+{
+    GLuint prog;
+    GLenum shaderType[3] = {
+        GL_VERTEX_SHADER,
+        GL_GEOMETRY_SHADER,
+        GL_FRAGMENT_SHADER
+    };
+    prog = glCreateProgram();
+    for (int i = 0; i < 3; ++i) {
+        if (shaders[i] != NULL) {
+            printf("Compiling %s ...\n", shaders[i]);
+            const GLchar *shaderStr = ProgNuanceur::lireNuanceur(shaders[i]);
+            if (shaderStr == NULL)
+                break;
+            GLuint s = glCreateShader(shaderType[i]);
+            glShaderSource( s, 1, &shaderStr, NULL );
+            glCompileShader( s );
+            glAttachShader( prog, s );
+            ProgNuanceur::afficherLogCompile( s );
+            delete [] shaderStr;
+        }
+    }
+    glLinkProgram(prog);
+    ProgNuanceur::afficherLogLink(prog);
+    return prog;
+}
+
+
+GLuint
+getloc(GLuint prog, const GLchar *name, const int type)
+{
+	GLuint loc;
+	switch (type) {
+	case LocAttrib:
+		loc = glGetAttribLocation(prog, name);
+		break;
+	case LocUniform:
+		loc = glGetUniformLocation(prog, name);
+		break;
+	}
+	if (loc == -1)
+		fprintf(stderr, "Cannot find location for %s\n", name);
+	return loc;
+}
+
 
 void chargerNuanceurs()
 {
@@ -237,76 +399,28 @@ void chargerNuanceurs()
 
       ProgNuanceur::afficherLogLink( progBase );
       // demander la "Location" des variables
-      if ( ( locVertexBase = glGetAttribLocation( progBase, "Vertex" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de Vertex" << std::endl;
-      if ( ( locColorBase = glGetAttribLocation( progBase, "Color" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de Color" << std::endl;
-      if ( ( locmatrModelBase = glGetUniformLocation( progBase, "matrModel" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrModel" << std::endl;
-      if ( ( locmatrVisuBase = glGetUniformLocation( progBase, "matrVisu" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrVisu" << std::endl;
-      if ( ( locmatrProjBase = glGetUniformLocation( progBase, "matrProj" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrProj" << std::endl;
+      locVertexBase = getloc( progBase, "Vertex", LocAttrib );
+      locColorBase = getloc( progBase, "Color", LocAttrib );
+      locmatrModelBase = getloc( progBase, "matrModel", LocUniform );
+      locmatrVisuBase = getloc( progBase, "matrVisu", LocUniform );
+      locmatrProjBase = getloc( progBase, "matrProj", LocUniform );
    }
 
    // charger le nuanceur de ce TP
    {
       // créer le programme
-      prog = glCreateProgram();
+      const GLchar *shaders[3] = {"nuanceurSommetsSolution.glsl", "nuanceurGeometrieSolution.glsl", "nuanceurFragmentsSolution.glsl"};
+      prog = createShader(shaders);
 
-      // attacher le nuanceur de sommets
-#if !defined(SOL)
-      const GLchar *chainesSommets = ProgNuanceur::lireNuanceur( "nuanceurSommets.glsl" );
-#else
-      const GLchar *chainesSommets = ProgNuanceur::lireNuanceur( "nuanceurSommetsSolution.glsl" );
-#endif
-      if ( chainesSommets != NULL )
-      {
-         GLuint nuanceurObj = glCreateShader( GL_VERTEX_SHADER );
-         glShaderSource( nuanceurObj, 1, &chainesSommets, NULL );
-         glCompileShader( nuanceurObj );
-         glAttachShader( prog, nuanceurObj );
-         ProgNuanceur::afficherLogCompile( nuanceurObj );
-         delete [] chainesSommets;
-      }
-#if !defined(SOL)
-      const GLchar *chainesGeometrie = ProgNuanceur::lireNuanceur( "nuanceurGeometrie.glsl" );
-#else
-      const GLchar *chainesGeometrie = ProgNuanceur::lireNuanceur( "nuanceurGeometrieSolution.glsl" );
-#endif
-      if ( chainesGeometrie != NULL )
-      {
-         GLuint nuanceurObj = glCreateShader( GL_GEOMETRY_SHADER );
-         glShaderSource( nuanceurObj, 1, &chainesGeometrie, NULL );
-         glCompileShader( nuanceurObj );
-         glAttachShader( prog, nuanceurObj );
-         ProgNuanceur::afficherLogCompile( nuanceurObj );
-         delete [] chainesGeometrie;
-      }
-      // attacher le nuanceur de fragments
-#if !defined(SOL)
-      const GLchar *chainesFragments = ProgNuanceur::lireNuanceur( "nuanceurFragments.glsl" );
-#else
-      const GLchar *chainesFragments = ProgNuanceur::lireNuanceur( "nuanceurFragmentsSolution.glsl" );
-#endif
-      if ( chainesFragments != NULL )
-      {
-         GLuint nuanceurObj = glCreateShader( GL_FRAGMENT_SHADER );
-         glShaderSource( nuanceurObj, 1, &chainesFragments, NULL );
-         glCompileShader( nuanceurObj );
-         glAttachShader( prog, nuanceurObj );
-         ProgNuanceur::afficherLogCompile( nuanceurObj );
-         delete [] chainesFragments;
-      }
-
-      // faire l'édition des liens du programme
-      glLinkProgram( prog );
-
-      ProgNuanceur::afficherLogLink( prog );
       // demander la "Location" des variables
-      if ( ( locVertex = glGetAttribLocation( prog, "Vertex" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de Vertex" << std::endl;
-      if ( ( locNormal = glGetAttribLocation( prog, "Normal" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de Normal (partie 1)" << std::endl;
-      if ( ( locTexCoord = glGetAttribLocation( prog, "TexCoord" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de TexCoord (partie 3)" << std::endl;
-      if ( ( locmatrModel = glGetUniformLocation( prog, "matrModel" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrModel" << std::endl;
-      if ( ( locmatrVisu = glGetUniformLocation( prog, "matrVisu" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrVisu" << std::endl;
-      if ( ( locmatrProj = glGetUniformLocation( prog, "matrProj" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrProj" << std::endl;
-      if ( ( locmatrNormale = glGetUniformLocation( prog, "matrNormale" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de matrNormale (partie 1)" << std::endl;
-      if ( ( loclaTexture = glGetUniformLocation( prog, "laTexture" ) ) == -1 ) std::cerr << "!!! pas trouvé la \"Location\" de laTexture (partie 3)" << std::endl;
+      locVertex = getloc( prog, "Vertex", LocAttrib );
+      locNormal = getloc( prog, "Normal", LocAttrib );
+      locTexCoord = getloc( prog, "TexCoord", LocAttrib );
+      locmatrModel = getloc( prog, "matrModel" , LocUniform);
+      locmatrVisu = getloc( prog, "matrVisu" , LocUniform);
+      locmatrProj = getloc( prog, "matrProj" , LocUniform);
+      locmatrNormale = getloc( prog, "matrNormale" , LocUniform);
+      loclaTexture = getloc( prog, "laTexture" , LocUniform);
       if ( ( indLightSource = glGetUniformBlockIndex( prog, "LightSourceParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de LightSource" << std::endl;
       if ( ( indFrontMaterial = glGetUniformBlockIndex( prog, "MaterialParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de FrontMaterial" << std::endl;
       if ( ( indLightModel = glGetUniformBlockIndex( prog, "LightModelParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de LightModel" << std::endl;
@@ -346,7 +460,115 @@ void chargerNuanceurs()
          glUniformBlockBinding( prog, indvarsUnif, bindingIndex );
       }
    }
+
+   // Load RasterizeWaveMeshPosition shader
+   {
+      // créer le programme
+      const GLchar *shaders[3] = {"rasterizeWaveMeshPosition.vert", NULL, "rasterizeWaveMeshPosition.frag"};
+      progRasterizeWaveMeshPosition = createShader(shaders);
+      // demander la "Location" des variables
+      locVertexRWMP = getloc( progRasterizeWaveMeshPosition, "Vertex" , LocAttrib);
+      locTexCoordRWMP = getloc( progRasterizeWaveMeshPosition, "TexCoord" , LocAttrib);
+      locmatrModelRWMP = getloc( progRasterizeWaveMeshPosition, "matrModel" , LocUniform);
+      locmatrVisuRWMP = getloc( progRasterizeWaveMeshPosition, "matrVisu" , LocUniform);
+      locmatrProjRWMP = getloc( progRasterizeWaveMeshPosition, "matrProj" , LocUniform);
+      locTexRWMP = getloc( progRasterizeWaveMeshPosition, "tex" , LocUniform);
+   }
+
+   // Load AddPacketDisplacement shader
+   {
+      // créer le programme
+      const GLchar *shaders[3] = {"addPacketDisplacement.vert", "addPacketDisplacement.geom", "addPacketDisplacement.frag"};
+      progAddPacketDisplacement = createShader(shaders);
+      // demander la "Location" des variables
+      locVertexADP = getloc( progAddPacketDisplacement, "Vertex" , LocAttrib);
+      locTexCoordADP = getloc( progAddPacketDisplacement, "TexCoord" , LocAttrib);
+      locmatrModelADP = getloc( progAddPacketDisplacement, "matrModel" , LocUniform);
+      locmatrVisuADP = getloc( progAddPacketDisplacement, "matrVisu" , LocUniform);
+      locmatrProjADP = getloc( progAddPacketDisplacement, "matrProj" , LocUniform);
+      locTexADP = getloc( progAddPacketDisplacement, "tex" , LocUniform);
+   }
+
+   // Load DisplayPacketOutlined shader
+   {
+      const GLchar *shaders[3] = {"displayPacketOutlined.vert", "displayPacketOutlined.geom", "displayPacketOutlined.frag"};
+      progDisplayPacketOutlined = createShader(shaders);
+      locVertexDPO = getloc( progDisplayPacketOutlined, "Vertex" , LocAttrib);
+      locTexCoordDPO = getloc( progDisplayPacketOutlined, "TexCoord" , LocAttrib);
+      locmatrModelDPO = getloc( progDisplayPacketOutlined, "matrModel" , LocUniform);
+      locmatrVisuDPO = getloc( progDisplayPacketOutlined, "matrVisu" , LocUniform);
+      locmatrProjDPO = getloc( progDisplayPacketOutlined, "matrProj" , LocUniform);
+      locTexDPO = getloc( progDisplayPacketOutlined, "tex" , LocUniform);
+   }
+
+   // Load DisplayMicroMesh shader
+   {
+      const GLchar *shaders[3] = {"displayMicroMesh.vert", "displayMicroMesh.geom", "displayMicroMesh.frag"};
+      progDisplayMicroMesh = createShader(shaders);
+      locVertexDMM = getloc( progDisplayMicroMesh, "Vertex" , LocAttrib);
+      locTexCoordDMM = getloc( progDisplayMicroMesh, "TexCoord" , LocAttrib);
+      locmatrModelDMM = getloc( progDisplayMicroMesh, "matrModel" , LocUniform);
+      locmatrVisuDMM = getloc( progDisplayMicroMesh, "matrVisu" , LocUniform);
+      locmatrProjDMM = getloc( progDisplayMicroMesh, "matrProj" , LocUniform);
+      locTexDMM = getloc( progDisplayMicroMesh, "tex" , LocUniform);
+   }
+
+   // Load DisplayTerrain shader
+   {
+      const GLchar *shaders[3] = {"displayTerrain.vert", NULL, "displayTerrain.frag"};
+      progDisplayTerrain = createShader(shaders);
+      locVertexDT = getloc( progDisplayTerrain, "Vertex" , LocAttrib);
+      locTexCoordDT = getloc( progDisplayTerrain, "TexCoord" , LocAttrib);
+      locmatrModelDT = getloc( progDisplayTerrain, "matrModel" , LocUniform);
+      locmatrVisuDT = getloc( progDisplayTerrain, "matrVisu" , LocUniform);
+      locmatrProjDT = getloc( progDisplayTerrain, "matrProj" , LocUniform);
+      locTexDT = getloc( progDisplayTerrain, "tex" , LocUniform);
+   }
+
+   // Load RenderAA shader
+   {
+      const GLchar *shaders[3] = {"displayTerrain.vert", NULL, "displayTerrain.frag"};
+      progRenderAA = createShader(shaders);
+      locVertexRAA = getloc( progRenderAA, "Vertex" , LocAttrib);
+      locTexCoordRAA = getloc( progRenderAA, "TexCoord" , LocAttrib);
+      locmatrModelRAA = getloc( progRenderAA, "matrModel" , LocUniform);
+      locmatrVisuRAA = getloc( progRenderAA, "matrVisu" , LocUniform);
+      locmatrProjRAA = getloc( progRenderAA, "matrProj" , LocUniform);
+      locTexRAA = getloc( progRenderAA, "tex" , LocUniform);
+   }
 }
+
+
+// Create a screen space quad
+void initQuad()
+{
+   GLfloat vertices[3*2*2] = {
+      -1.0, -1.0,    1.0, -1.0,   -1.0,  1.0,
+       1.0, -1.0,    1.0,  1.0,   -1.0,  1.0
+   };
+   GLfloat texcoords[3*2*2] = {
+      0.0, 1.0,   1.0, 1.0,   0.0, 0.0,
+      1.0, 1.0,   1.0, 0.0,   0.0, 0.0
+   };
+
+   // allouer les objets OpenGL
+   glGenVertexArrays( 1, &vaoQuad );
+   glGenBuffers( 2, vbosQuad );
+   // initialiser le VAO
+   glBindVertexArray( vaoQuad );
+
+   // charger le VBO pour les vertices
+   glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[0] );
+   glBufferData( GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW );
+   glVertexAttribPointer( locVertexRWMP, 2, GL_FLOAT, GL_FALSE, 0, 0 );
+   glEnableVertexAttribArray(locVertex);
+   // Charger le VBO pour les coordonnées de texture
+   glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[1] );
+   glBufferData( GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW );
+   glVertexAttribPointer( locTexCoordRWMP, 2, GL_FLOAT, GL_FALSE, 0, 0 );
+   glEnableVertexAttribArray(locTexCoord);
+}
+
 
 // initialisation d'openGL
 void initialiser()
@@ -360,6 +582,9 @@ void initialiser()
    posFBO = new FBO();
    heightFBO = new FBO();
    aaFBO = new FBO();
+
+   // Create Packets
+   packets = new Packets(packetBudget);
 
    // couleur de l'arrière-plan
    glClearColor( 0.4, 0.2, 0.0, 1.0 );
@@ -375,6 +600,7 @@ void initialiser()
 
    // charger les nuanceurs
    chargerNuanceurs();
+   initQuad();
    glUseProgram( prog );
 
    // (partie 1) créer le cube
@@ -497,6 +723,16 @@ void conclure()
    delete aaFBO;
 }
 
+void drawQuad()
+{
+    glUseProgram(progRasterizeWaveMeshPosition);
+    glUniformMatrix4fv( locmatrProjRWMP, 1, GL_FALSE, matrProj );
+    glUniformMatrix4fv( locmatrVisuRWMP, 1, GL_FALSE, matrVisu );
+    glUniformMatrix4fv( locmatrModelRWMP, 1, GL_FALSE, matrModel );
+    glBindVertexArray(vaoQuad);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
 void afficherModele()
 {
    // partie 3: paramètres de texture
@@ -508,7 +744,7 @@ void afficherModele()
       break;
    case 1:
       //std::cout << "Texture DE" << std::endl;
-      glBindTexture( GL_TEXTURE_2D, textureDE );
+      glBindTexture( GL_TEXTURE_2D, texTerrain );
       break;
    case 2:
       //std::cout << "Texture ECHIQUIER" << std::endl;
@@ -530,53 +766,7 @@ void afficherModele()
       // (partie 1: ne pas oublier de calculer et donner une matrice pour les transformations des normales)
       glUniformMatrix3fv( locmatrNormale, 1, GL_TRUE, glm::value_ptr( glm::inverse( glm::mat3( matrVisu.getMatr() * matrModel.getMatr() ) ) ) );
 
-      switch ( modele )
-      {
-      default:
-      case 1:
-         // afficher le cube
-         glBindVertexArray( vao[0] );
-         glBindBuffer( GL_ARRAY_BUFFER, varsUnif.texnumero == 1 ? vbo[2] : vbo[3] );
-         glVertexAttribPointer( locTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0 );
-         glDrawArrays( GL_TRIANGLE_STRIP,  0, 4 );
-         glDrawArrays( GL_TRIANGLE_STRIP,  4, 4 );
-         glDrawArrays( GL_TRIANGLE_STRIP,  8, 4 );
-         glDrawArrays( GL_TRIANGLE_STRIP, 12, 4 );
-         glDrawArrays( GL_TRIANGLE_STRIP, 16, 4 );
-         glDrawArrays( GL_TRIANGLE_STRIP, 20, 4 );
-         glBindVertexArray( 0 );
-         break;
-      case 2:
-         tore->afficher();
-         break;
-      case 3:
-         sphere->afficher();
-         break;
-      case 4:
-         matrModel.Rotate( -90.0, 1.0, 0.0, 0.0 );
-         matrModel.Translate( 0.0, 0.0, -0.5 );
-         matrModel.Scale( 0.5, 0.5, 0.5 );
-         glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
-         glUniformMatrix3fv( locmatrNormale, 1, GL_TRUE, glm::value_ptr( glm::inverse( glm::mat3( matrVisu.getMatr() * matrModel.getMatr() ) ) ) );
-         theiere->afficher( );
-         break;
-      case 5:
-         matrModel.PushMatrix(); {
-            matrModel.Translate( 0.0, 0.0, -1.5 );
-            glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
-            glUniformMatrix3fv( locmatrNormale, 1, GL_TRUE, glm::value_ptr( glm::inverse( glm::mat3( matrVisu.getMatr() * matrModel.getMatr() ) ) ) );
-            cylindre->afficher();
-         } matrModel.PopMatrix();
-         break;
-      case 6:
-         matrModel.PushMatrix(); {
-            matrModel.Translate( 0.0, 0.0, -1.5 );
-            glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
-            glUniformMatrix3fv( locmatrNormale, 1, GL_TRUE, glm::value_ptr( glm::inverse( glm::mat3( matrVisu.getMatr() * matrModel.getMatr() ) ) ) );
-            cone->afficher();
-         } matrModel.PopMatrix();
-         break;
-      }
+      drawQuad();
    } matrModel.PopMatrix(); glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
 }
 
@@ -644,7 +834,7 @@ void FenetreTP::afficherScene()
    }
    glUniformMatrix4fv( locmatrProjBase, 1, GL_FALSE, matrProj );
 
-   matrVisu.LookAt( 0.0, 0.0, distCam,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0 );
+   matrVisu.LookAt( 0.0, 3.0, distCam,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0 );
    glUniformMatrix4fv( locmatrVisuBase, 1, GL_FALSE, matrVisu );
 
    matrModel.LoadIdentity();

@@ -7,7 +7,7 @@
 #define SCENE_EXTENT 100.0f					// extent of the entire scene (packets traveling outside are removed)
 #define MIN_WATER_DEPTH 0.1f				// minimum water depth (meters)
 #define MAX_WATER_DEPTH 5.0f				// maximum water depth (meters)
-#define WATER_TERRAIN_FILE "TestIsland.bmp"// Contains water depth and land height in different channels
+#define WATER_TERRAIN_FILE "./textures/TestIsland.bmp"// Contains water depth and land height in different channels
 
 
 // rendering parameters
@@ -43,3 +43,6 @@
 // UI consts
 #define MAX_PACKET_BUDGET 100000
 #define MIN_PACKET_BUDGET 1000
+#define MIN_WAVE_SPEED 0.0
+#define MAX_WAVE_SPEED 1.0
+#define INIT_WAVE_SPEED 0.07

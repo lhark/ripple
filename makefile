@@ -8,9 +8,9 @@ DEPDIR := $(BUILDDIR)/deps
 #EXE := $(BINDIR)/OPHD
 EXE := ripple
 
-CFLAGS := -std=c++11 -g -Wall -Wno-unknown-pragmas -I/usr/include/glm -I/usr/include/eigen3 $(shell pkg-config --cflags glew)
+CFLAGS := -std=c++11 -g -fopenmp -Wall -Wno-unknown-pragmas -I/usr/include/glm -I/usr/include/eigen3 $(shell pkg-config --cflags glew)
 CFLAGS += $(shell pkg-config --cflags sdl2)
-LDFLAGS := -lstdc++ -lm -lglfw -lGLEW -lGL
+LDFLAGS := -fopenmp -lstdc++ -lm -lglfw -lGLEW -lGL
 LDFLAGS += $(shell pkg-config --libs sdl2)
 
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
