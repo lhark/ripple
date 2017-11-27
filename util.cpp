@@ -91,9 +91,9 @@ checkglerr(const char *msg, const int line)
 	while ((err = glGetError()) != GL_NO_ERROR)
 	{
 		if (err >= GL_INVALID_ENUM && err <= GL_INVALID_FRAMEBUFFER_OPERATION)
-			fprintf(stderr, "%s l.%d\n", errors[err - GL_INVALID_ENUM], line);
+			fprintf(stderr, "%s : %s l.%d\n", msg, errors[err - GL_INVALID_ENUM], line);
 		else
-			fprintf(stderr, "Unknown error l.%d\n", line);
+			fprintf(stderr, "%s : Unknown error l.%d\n", msg, line);
 		++rc;
 	}
 	return rc;

@@ -4,10 +4,20 @@
 #include "constants.h"
 #include "FBO.h"
 #include "Packets.h"
+#include "util.h"
 
 #define SOL 1
 
 enum {LocAttrib, LocUniform}; /* Shader location type */
+enum {
+    RWMP_SHADER,
+    APD_SHADER,
+    DPO_SHADER,
+    DMM_SHADER,
+    DT_SHADER,
+    RAA_SHADER,
+    NB_SHADERS
+}; /* Shaders stages */
 
 // variables pour l'utilisation des nuanceurs
 GLuint prog;      // votre programme de nuanceurs
@@ -34,15 +44,17 @@ GLint locmatrProjRWMP = -1;
 GLint locmatrNormaleRWMP = -1;
 GLint locTexRWMP = -1;
 // Locations for AddPacketDisplacement shader
-GLuint locVertexADP = -1;
-GLuint locTexCoordADP = -1;
-GLuint locmatrModelADP = -1;
-GLuint locmatrVisuADP = -1;
-GLuint locmatrProjADP = -1;
-GLuint locTexADP = -1;
+GLuint locPosAPD = -1;
+GLuint locAtt1APD = -1;
+GLuint locAtt2APD = -1;
+GLuint locmatrModelAPD = -1;
+GLuint locmatrVisuAPD = -1;
+GLuint locmatrProjAPD = -1;
+GLuint locTexAPD = -1;
 // Locations for DisplayPacketOutlined shader
-GLuint locVertexDPO = -1;
-GLuint locTexCoordDPO = -1;
+GLuint locPosDPO = -1;
+GLuint locAtt1DPO = -1;
+GLuint locAtt2DPO = -1;
 GLuint locmatrModelDPO = -1;
 GLuint locmatrVisuDPO = -1;
 GLuint locmatrProjDPO = -1;
@@ -80,11 +92,11 @@ GLint locmatrModelBase = -1;
 GLint locmatrVisuBase = -1;
 GLint locmatrProjBase = -1;
 
-GLuint vao[2];
-GLuint vaoQuad;
-GLuint vbosQuad[2];
+GLuint vao[NB_SHADERS];
 GLuint vbo[5];
 GLuint ubo[4];
+GLuint vbosQuad[2];
+GLuint vboPacket;
 
 // matrices de du pipeline graphique
 MatricePipeline matrModel;
@@ -116,7 +128,7 @@ FBO *aaFBO;
 
 // Wave Packets
 Packets *packets;
-int packetBudget = MIN_PACKET_BUDGET;
+int packetBudget = 10000;
 /* Wave packets:
  * vec4: xy = position, zw = direction
  * vec4: x = amplitude, y = wavelength, z = phase offset, w = enveloppe size
@@ -195,6 +207,11 @@ struct
 // copie directe vers le nuanceur où les variables seront bien de type 'bool'. )
 
 
+/* Forward declarations */
+void displayPacketOutlined(int count);
+void addPacketDisplacement(int count);
+
+
 void verifierAngles()
 {
    if ( thetaCam > 360.0 )
@@ -265,12 +282,18 @@ void updatePackets()
             packetChunk += 3; /* The last 3 elements aren't needed */
             displayedPackets++;
             if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
-                /* TODO Update VBO */
+                glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
+                /* TODO Use Buffer mapping for better performance */
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                //displayPacketOutlined(packetChunk / 12);
                 /* TODO EvaluatePackets(packetChunk) */
+                addPacketDisplacement(packetChunk / 12);
                 packetChunk = 0;
             }
         }
     }
+    // printf("PacketData[0] = %f , %f\n", packetData[0], packetData[1]);
     /* Ghost packets */
     for (int i = 0; i < packets->m_usedGhosts; ++i) {
         int pk = packets->m_usedGhost[i];
@@ -290,13 +313,21 @@ void updatePackets()
         packetChunk += 3; /* The last 3 elements aren't needed */
         displayedPackets++;
         if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
-            /* TODO Update VBO */
+            glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            //displayPacketOutlined();
             /* TODO EvaluatePackets(packetChunk) */
+            addPacketDisplacement(packetChunk / 12);
             packetChunk = 0;
         }
     }
-    /* TODO Update VBO */
+    glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //displayPacketOutlined(packetChunk / 12);
     /* TODO EvaluatePackets(packetChunk) */
+    addPacketDisplacement(packetChunk / 12);
     /* TODO DisplayScene */
     /* TODO Get camera center */
 }
@@ -406,61 +437,6 @@ void chargerNuanceurs()
       locmatrProjBase = getloc( progBase, "matrProj", LocUniform );
    }
 
-   // charger le nuanceur de ce TP
-   {
-      // créer le programme
-      const GLchar *shaders[3] = {"nuanceurSommetsSolution.glsl", "nuanceurGeometrieSolution.glsl", "nuanceurFragmentsSolution.glsl"};
-      prog = createShader(shaders);
-
-      // demander la "Location" des variables
-      locVertex = getloc( prog, "Vertex", LocAttrib );
-      locNormal = getloc( prog, "Normal", LocAttrib );
-      locTexCoord = getloc( prog, "TexCoord", LocAttrib );
-      locmatrModel = getloc( prog, "matrModel" , LocUniform);
-      locmatrVisu = getloc( prog, "matrVisu" , LocUniform);
-      locmatrProj = getloc( prog, "matrProj" , LocUniform);
-      locmatrNormale = getloc( prog, "matrNormale" , LocUniform);
-      loclaTexture = getloc( prog, "laTexture" , LocUniform);
-      if ( ( indLightSource = glGetUniformBlockIndex( prog, "LightSourceParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de LightSource" << std::endl;
-      if ( ( indFrontMaterial = glGetUniformBlockIndex( prog, "MaterialParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de FrontMaterial" << std::endl;
-      if ( ( indLightModel = glGetUniformBlockIndex( prog, "LightModelParameters" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de LightModel" << std::endl;
-      if ( ( indvarsUnif = glGetUniformBlockIndex( prog, "varsUnif" ) ) == GL_INVALID_INDEX ) std::cerr << "!!! pas trouvé l'\"index\" de varsUnif" << std::endl;
-
-      // charger les ubo
-      {
-         glBindBuffer( GL_UNIFORM_BUFFER, ubo[0] );
-         glBufferData( GL_UNIFORM_BUFFER, sizeof(LightSource), &LightSource, GL_DYNAMIC_COPY );
-         glBindBuffer( GL_UNIFORM_BUFFER, 0 );
-         const GLuint bindingIndex = 0;
-         glBindBufferBase( GL_UNIFORM_BUFFER, bindingIndex, ubo[0] );
-         glUniformBlockBinding( prog, indLightSource, bindingIndex );
-      }
-      {
-         glBindBuffer( GL_UNIFORM_BUFFER, ubo[1] );
-         glBufferData( GL_UNIFORM_BUFFER, sizeof(FrontMaterial), &FrontMaterial, GL_DYNAMIC_COPY );
-         glBindBuffer( GL_UNIFORM_BUFFER, 0 );
-         const GLuint bindingIndex = 1;
-         glBindBufferBase( GL_UNIFORM_BUFFER, bindingIndex, ubo[1] );
-         glUniformBlockBinding( prog, indFrontMaterial, bindingIndex );
-      }
-      {
-         glBindBuffer( GL_UNIFORM_BUFFER, ubo[2] );
-         glBufferData( GL_UNIFORM_BUFFER, sizeof(LightModel), &LightModel, GL_DYNAMIC_COPY );
-         glBindBuffer( GL_UNIFORM_BUFFER, 0 );
-         const GLuint bindingIndex = 2;
-         glBindBufferBase( GL_UNIFORM_BUFFER, bindingIndex, ubo[2] );
-         glUniformBlockBinding( prog, indLightModel, bindingIndex );
-      }
-      {
-         glBindBuffer( GL_UNIFORM_BUFFER, ubo[3] );
-         glBufferData( GL_UNIFORM_BUFFER, sizeof(varsUnif), &varsUnif, GL_DYNAMIC_COPY );
-         glBindBuffer( GL_UNIFORM_BUFFER, 0 );
-         const GLuint bindingIndex = 3;
-         glBindBufferBase( GL_UNIFORM_BUFFER, bindingIndex, ubo[3] );
-         glUniformBlockBinding( prog, indvarsUnif, bindingIndex );
-      }
-   }
-
    // Load RasterizeWaveMeshPosition shader
    {
       // créer le programme
@@ -481,20 +457,22 @@ void chargerNuanceurs()
       const GLchar *shaders[3] = {"addPacketDisplacement.vert", "addPacketDisplacement.geom", "addPacketDisplacement.frag"};
       progAddPacketDisplacement = createShader(shaders);
       // demander la "Location" des variables
-      locVertexADP = getloc( progAddPacketDisplacement, "Vertex" , LocAttrib);
-      locTexCoordADP = getloc( progAddPacketDisplacement, "TexCoord" , LocAttrib);
-      locmatrModelADP = getloc( progAddPacketDisplacement, "matrModel" , LocUniform);
-      locmatrVisuADP = getloc( progAddPacketDisplacement, "matrVisu" , LocUniform);
-      locmatrProjADP = getloc( progAddPacketDisplacement, "matrProj" , LocUniform);
-      locTexADP = getloc( progAddPacketDisplacement, "tex" , LocUniform);
+      locPosAPD = getloc( progAddPacketDisplacement, "Pos" , LocAttrib);
+      locAtt1APD = getloc( progAddPacketDisplacement, "Att1" , LocAttrib);
+      locAtt2APD = getloc( progAddPacketDisplacement, "Att2" , LocAttrib);
+      locmatrModelAPD = getloc( progAddPacketDisplacement, "matrModel" , LocUniform);
+      locmatrVisuAPD = getloc( progAddPacketDisplacement, "matrVisu" , LocUniform);
+      locmatrProjAPD = getloc( progAddPacketDisplacement, "matrProj" , LocUniform);
+      locTexAPD = getloc( progAddPacketDisplacement, "tex" , LocUniform);
    }
 
    // Load DisplayPacketOutlined shader
    {
       const GLchar *shaders[3] = {"displayPacketOutlined.vert", "displayPacketOutlined.geom", "displayPacketOutlined.frag"};
       progDisplayPacketOutlined = createShader(shaders);
-      locVertexDPO = getloc( progDisplayPacketOutlined, "Vertex" , LocAttrib);
-      locTexCoordDPO = getloc( progDisplayPacketOutlined, "TexCoord" , LocAttrib);
+      locPosDPO = getloc( progDisplayPacketOutlined, "Pos" , LocAttrib);
+      locAtt1DPO = getloc( progDisplayPacketOutlined, "Att1" , LocAttrib);
+      locAtt2DPO = getloc( progDisplayPacketOutlined, "Att2" , LocAttrib);
       locmatrModelDPO = getloc( progDisplayPacketOutlined, "matrModel" , LocUniform);
       locmatrVisuDPO = getloc( progDisplayPacketOutlined, "matrVisu" , LocUniform);
       locmatrProjDPO = getloc( progDisplayPacketOutlined, "matrProj" , LocUniform);
@@ -527,7 +505,7 @@ void chargerNuanceurs()
 
    // Load RenderAA shader
    {
-      const GLchar *shaders[3] = {"displayTerrain.vert", NULL, "displayTerrain.frag"};
+      const GLchar *shaders[3] = {"renderAA.vert", NULL, "RenderAA.frag"};
       progRenderAA = createShader(shaders);
       locVertexRAA = getloc( progRenderAA, "Vertex" , LocAttrib);
       locTexCoordRAA = getloc( progRenderAA, "TexCoord" , LocAttrib);
@@ -552,21 +530,61 @@ void initQuad()
    };
 
    // allouer les objets OpenGL
-   glGenVertexArrays( 1, &vaoQuad );
+   /* TODO Add support for RenderAA shader */
    glGenBuffers( 2, vbosQuad );
-   // initialiser le VAO
-   glBindVertexArray( vaoQuad );
 
-   // charger le VBO pour les vertices
+   /* Prepare VAO for RasterizeWaveMeshPosition shader */
+   glBindVertexArray(vao[RWMP_SHADER]);
+   // Bind vertices VBO
    glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[0] );
    glBufferData( GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW );
    glVertexAttribPointer( locVertexRWMP, 2, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locVertex);
-   // Charger le VBO pour les coordonnées de texture
+   glEnableVertexAttribArray(locVertexRWMP);
+   // Bind texture coord VBO
    glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[1] );
    glBufferData( GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW );
    glVertexAttribPointer( locTexCoordRWMP, 2, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locTexCoord);
+   glEnableVertexAttribArray(locTexCoordRWMP);
+
+   /* Prepare VAO for RenderAA shader */
+   glBindVertexArray(vao[RAA_SHADER]);
+   // Bind vertices VBO
+   glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[0] );
+   glVertexAttribPointer( locVertexRAA, 2, GL_FLOAT, GL_FALSE, 0, 0 );
+   glEnableVertexAttribArray(locVertexRAA);
+   // Bind texture coord VBO
+   glBindBuffer( GL_ARRAY_BUFFER, vbosQuad[1] );
+   glVertexAttribPointer( locTexCoordRAA, 2, GL_FLOAT, GL_FALSE, 0, 0 );
+   glEnableVertexAttribArray(locTexCoordRAA);
+}
+
+
+// Create the buffer to store wave packets
+void initPacketMesh()
+{
+    glGenBuffers(1, &vboPacket);
+
+    glBindVertexArray(vao[APD_SHADER]);
+    glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(packetData), NULL, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(locPosAPD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)0);
+    glVertexAttribPointer(locAtt1APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)4);
+    glVertexAttribPointer(locAtt2APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)8);
+    glEnableVertexAttribArray(locPosAPD);
+    glEnableVertexAttribArray(locAtt1APD);
+    glEnableVertexAttribArray(locAtt2APD);
+
+    glBindVertexArray(vao[DPO_SHADER]);
+    glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
+    /* No need to initialize the buffer a second time */
+    glVertexAttribPointer(locPosDPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)0);
+    glVertexAttribPointer(locAtt1DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)4);
+    glVertexAttribPointer(locAtt2DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)8);
+    glEnableVertexAttribArray(locPosDPO);
+    glEnableVertexAttribArray(locAtt1DPO);
+    glEnableVertexAttribArray(locAtt2DPO);
+
+    glBindVertexArray(0);
 }
 
 
@@ -576,7 +594,7 @@ void initialiser()
    // donner l'orientation du modèle
    thetaCam = 0.0;
    phiCam = 0.0;
-   distCam = 30.0;
+   distCam = 90.0;
 
    // Create FBOs
    posFBO = new FBO();
@@ -597,102 +615,14 @@ void initialiser()
 
    // allouer les UBO pour les variables uniformes
    glGenBuffers( 4, ubo );
+   glGenVertexArrays(NB_SHADERS, vao);
 
    // charger les nuanceurs
    chargerNuanceurs();
+
+   // Initialize VBOs
    initQuad();
-   glUseProgram( prog );
-
-   // (partie 1) créer le cube
-   /*         +Y                    */
-   /*   3+-----------+2             */
-   /*    |\          |\             */
-   /*    | \         | \            */
-   /*    |  \        |  \           */
-   /*    |  7+-----------+6         */
-   /*    |   |       |   |          */
-   /*    |   |       |   |          */
-   /*   0+---|-------+1  |          */
-   /*     \  |        \  |     +X   */
-   /*      \ |         \ |          */
-   /*       \|          \|          */
-   /*       4+-----------+5         */
-   /*             +Z                */
-
-   GLfloat sommets[3*4*6] =
-   {
-      -1.0,  1.0, -1.0,    1.0,  1.0, -1.0,  -1.0, -1.0, -1.0,    1.0, -1.0, -1.0,   // P3,P2,P0,P1
-       1.0, -1.0,  1.0,   -1.0, -1.0,  1.0,   1.0, -1.0, -1.0,   -1.0, -1.0, -1.0,   // P5,P4,P1,P0
-       1.0,  1.0,  1.0,    1.0, -1.0,  1.0,   1.0,  1.0, -1.0,    1.0, -1.0, -1.0,   // P6,P5,P2,P1
-      -1.0,  1.0,  1.0,    1.0,  1.0,  1.0,  -1.0,  1.0, -1.0,    1.0,  1.0, -1.0,   // P7,P6,P3,P2
-      -1.0, -1.0,  1.0,   -1.0,  1.0,  1.0,  -1.0, -1.0, -1.0,   -1.0,  1.0, -1.0,   // P4,P7,P0,P3
-      -1.0, -1.0,  1.0,    1.0, -1.0,  1.0,  -1.0,  1.0,  1.0,    1.0,  1.0,  1.0    // P4,P5,P7,P6
-   };
-   GLfloat normales[3*4*6] =
-   {
-      0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,
-      0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,
-      1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,
-      0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,
-     -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,
-      0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,
-   };
-   GLfloat texcoordsDe[2*4*6] =
-   {
-      1.000000,0.000000, 0.666666,0.000000, 1.000000,0.333333, 0.666666,0.333333,
-      0.000000,0.666666, 0.333333,0.666666, 0.000000,0.333333, 0.333333,0.333333,
-      0.666666,1.000000, 0.666666,0.666666, 0.333333,1.000000, 0.333333,0.666666,
-      1.000000,0.333333, 0.666666,0.333333, 1.000000,0.666666, 0.666666,0.666666,
-      0.333333,0.000000, 0.333333,0.333333, 0.666666,0.000000, 0.666666,0.333333,
-      0.666666,0.333333, 0.333333,0.333333, 0.666666,0.666666, 0.333333,0.666666
-   };
-   GLfloat texcoordsEchiquier[2*4*6] =
-   {
-      -1.0, -1.0,  -1.0,  2.0,   2.0, -1.0,   2.0,  2.0,
-       2.0, -1.0,  -1.0, -1.0,   2.0,  2.0,  -1.0,  2.0,
-      -1.0, -1.0,  -1.0,  2.0,   2.0, -1.0,   2.0,  2.0,
-      -1.0,  2.0,   2.0,  2.0,  -1.0, -1.0,   2.0, -1.0,
-       2.0,  2.0,   2.0, -1.0,  -1.0,  2.0,  -1.0, -1.0,
-      -1.0, -1.0,  -1.0,  2.0,   2.0, -1.0,   2.0,  2.0
-   };
-
-   // allouer les objets OpenGL
-   glGenVertexArrays( 2, vao );
-   glGenBuffers( 5, vbo );
-   // initialiser le VAO
-   glBindVertexArray( vao[0] );
-
-   // charger le VBO pour les sommets
-   glBindBuffer( GL_ARRAY_BUFFER, vbo[0] );
-   glBufferData( GL_ARRAY_BUFFER, sizeof(sommets), sommets, GL_STATIC_DRAW );
-   glVertexAttribPointer( locVertex, 3, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locVertex);
-   // (partie 1) charger le VBO pour les normales
-   glBindBuffer( GL_ARRAY_BUFFER, vbo[1] );
-   glBufferData( GL_ARRAY_BUFFER, sizeof(normales), normales, GL_STATIC_DRAW );
-   glVertexAttribPointer( locNormal, 3, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locNormal);
-   // (partie 3) charger le VBO pour les coordonnées de texture du dé
-   glBindBuffer( GL_ARRAY_BUFFER, vbo[2] );
-   glBufferData( GL_ARRAY_BUFFER, sizeof(texcoordsDe), texcoordsDe, GL_STATIC_DRAW );
-   glVertexAttribPointer( locTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locTexCoord);
-   // (partie 3) charger le VBO pour les coordonnées de texture de l'échiquier
-   glBindBuffer( GL_ARRAY_BUFFER, vbo[3] );
-   glBufferData( GL_ARRAY_BUFFER, sizeof(texcoordsEchiquier), texcoordsEchiquier, GL_STATIC_DRAW );
-   glVertexAttribPointer( locTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locTexCoord);
-
-   glBindVertexArray(0);
-
-   // initialiser le VAO pour une ligne (montrant la direction du spot)
-   glBindVertexArray( vao[1] );
-   GLfloat coords[] = { 0., 0., 0., 0., 0., 1. };
-   glBindBuffer( GL_ARRAY_BUFFER, vbo[4] );
-   glBufferData( GL_ARRAY_BUFFER, sizeof(coords), coords, GL_STATIC_DRAW );
-   glVertexAttribPointer( locVertexBase, 3, GL_FLOAT, GL_FALSE, 0, 0 );
-   glEnableVertexAttribArray(locVertexBase);
-   glBindVertexArray(0);
+   initPacketMesh();
 
    // créer quelques autres formes
    sphere = new FormeSphere( 1.0, 32, 32 );
@@ -709,7 +639,7 @@ void initialiser()
 void conclure()
 {
    glUseProgram( 0 );
-   glDeleteVertexArrays( 2, vao );
+   glDeleteVertexArrays( NB_SHADERS, vao );
    glDeleteBuffers( 4, vbo );
    glDeleteBuffers( 4, ubo );
    delete sphere;
@@ -721,6 +651,7 @@ void conclure()
    delete posFBO;
    delete heightFBO;
    delete aaFBO;
+   delete packets;
 }
 
 void drawQuad()
@@ -729,29 +660,38 @@ void drawQuad()
     glUniformMatrix4fv( locmatrProjRWMP, 1, GL_FALSE, matrProj );
     glUniformMatrix4fv( locmatrVisuRWMP, 1, GL_FALSE, matrVisu );
     glUniformMatrix4fv( locmatrModelRWMP, 1, GL_FALSE, matrModel );
-    glBindVertexArray(vaoQuad);
+    glBindVertexArray(vao[RWMP_SHADER]);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
+void displayPacketOutlined(int count)
+{
+    glUseProgram(progDisplayPacketOutlined);
+    glBindVertexArray(vao[DPO_SHADER]);
+    glUniformMatrix4fv(locmatrModelDPO, 1, GL_FALSE, matrModel);
+    glUniformMatrix4fv(locmatrVisuDPO, 1, GL_FALSE, matrVisu);
+    glUniformMatrix4fv(locmatrProjDPO, 1, GL_FALSE, matrProj);
+    glDrawArrays(GL_POINTS, 0, count);
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+
+void addPacketDisplacement(int count)
+{
+    glUseProgram(progAddPacketDisplacement);
+    glBindVertexArray(vao[APD_SHADER]);
+    glUniformMatrix4fv(locmatrModelAPD, 1, GL_FALSE, matrModel);
+    glUniformMatrix4fv(locmatrVisuAPD, 1, GL_FALSE, matrVisu);
+    glUniformMatrix4fv(locmatrProjAPD, 1, GL_FALSE, matrProj);
+    glDrawArrays(GL_POINTS, 0, count);
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+
 void afficherModele()
 {
-   // partie 3: paramètres de texture
-   switch ( varsUnif.texnumero )
-   {
-   default:
-      //std::cout << "Sans texture" << std::endl;
-      glBindTexture( GL_TEXTURE_2D, 0 );
-      break;
-   case 1:
-      //std::cout << "Texture DE" << std::endl;
-      glBindTexture( GL_TEXTURE_2D, texTerrain );
-      break;
-   case 2:
-      //std::cout << "Texture ECHIQUIER" << std::endl;
-      glBindTexture( GL_TEXTURE_2D, textureECHIQUIER );
-      break;
-   }
-
    // Dessiner le modèle
    matrModel.PushMatrix(); {
 
@@ -763,11 +703,8 @@ void afficherModele()
       matrModel.Scale( 5.0, 5.0, 5.0 );
 
       glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
-      // (partie 1: ne pas oublier de calculer et donner une matrice pour les transformations des normales)
-      glUniformMatrix3fv( locmatrNormale, 1, GL_TRUE, glm::value_ptr( glm::inverse( glm::mat3( matrVisu.getMatr() * matrModel.getMatr() ) ) ) );
-
-      drawQuad();
-   } matrModel.PopMatrix(); glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
+      updatePackets();
+   } matrModel.PopMatrix();
 }
 
 void afficherLumiere()
@@ -812,7 +749,7 @@ void FenetreTP::afficherScene()
    if ( enPerspective )
    {
       matrProj.Perspective( 35.0, (GLdouble)largeur_ / (GLdouble)hauteur_,
-                            0.1, 60.0 );
+                            0.1, 300.0 );
    }
    else
    {
@@ -822,14 +759,14 @@ void FenetreTP::afficherScene()
          matrProj.Ortho( -d, d,
                          -d*(GLdouble)hauteur_ / (GLdouble)largeur_,
                          d*(GLdouble)hauteur_ / (GLdouble)largeur_,
-                         0.1, 60.0 );
+                         0.1, 300.0 );
       }
       else
       {
          matrProj.Ortho( -d*(GLdouble)largeur_ / (GLdouble)hauteur_,
                          d*(GLdouble)largeur_ / (GLdouble)hauteur_,
                          -d, d,
-                         0.1, 60.0 );
+                         0.1, 300.0 );
       }
    }
    glUniformMatrix4fv( locmatrProjBase, 1, GL_FALSE, matrProj );
@@ -844,40 +781,6 @@ void FenetreTP::afficherScene()
    if ( afficheAxes ) FenetreTP::afficherAxes( 8.0 );
 
    // dessiner la scène
-   afficherLumiere();
-
-   glUseProgram( prog );
-
-   // mettre à jour les blocs de variables uniformes
-   {
-      glBindBuffer( GL_UNIFORM_BUFFER, ubo[0] );
-      GLvoid *p = glMapBuffer( GL_UNIFORM_BUFFER, GL_WRITE_ONLY );
-      memcpy( p, &LightSource, sizeof(LightSource) );
-      glUnmapBuffer( GL_UNIFORM_BUFFER );
-   }
-   {
-      glBindBuffer( GL_UNIFORM_BUFFER, ubo[1] );
-      GLvoid *p = glMapBuffer( GL_UNIFORM_BUFFER, GL_WRITE_ONLY );
-      memcpy( p, &FrontMaterial, sizeof(FrontMaterial) );
-      glUnmapBuffer( GL_UNIFORM_BUFFER );
-   }
-   {
-      glBindBuffer( GL_UNIFORM_BUFFER, ubo[2] );
-      GLvoid *p = glMapBuffer( GL_UNIFORM_BUFFER, GL_WRITE_ONLY );
-      memcpy( p, &LightModel, sizeof(LightModel) );
-      glUnmapBuffer( GL_UNIFORM_BUFFER );
-   }
-   {
-      glBindBuffer( GL_UNIFORM_BUFFER, ubo[3] );
-      GLvoid *p = glMapBuffer( GL_UNIFORM_BUFFER, GL_WRITE_ONLY );
-      memcpy( p, &varsUnif, sizeof(varsUnif) );
-      glUnmapBuffer( GL_UNIFORM_BUFFER );
-   }
-
-   // mettre à jour les matrices et autres uniformes
-   glUniformMatrix4fv( locmatrProj, 1, GL_FALSE, matrProj );
-   glUniformMatrix4fv( locmatrVisu, 1, GL_FALSE, matrVisu );
-   glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
    //glActiveTexture( GL_TEXTURE0 ); // activer la texture '0' (valeur de défaut)
    glUniform1i( loclaTexture, 0 ); // '0' => utilisation de GL_TEXTURE0
 
@@ -941,8 +844,9 @@ void FenetreTP::clavier( TP_touche touche )
       break;
 
    case TP_r: // Alterner entre le modèle de réflexion spéculaire: Phong, Blinn
-      varsUnif.utiliseBlinn = !varsUnif.utiliseBlinn;
-      echoEtats( );
+       // Send one wave front
+       packets->CreateCircularWavefront(0.0, 0.0, 2.0, 0.2, 1.0, 10000);
+       printf("Sending a circular wavefront...\n");
       break;
 
    case TP_s: // Alterner entre le modèle de spot: OpenGL, Direct3D
