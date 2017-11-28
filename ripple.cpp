@@ -42,7 +42,6 @@ GLint locmatrModelRWMP = -1;
 GLint locmatrVisuRWMP = -1;
 GLint locmatrProjRWMP = -1;
 GLint locmatrNormaleRWMP = -1;
-GLint locTexRWMP = -1;
 // Locations for AddPacketDisplacement shader
 GLuint locPosAPD = -1;
 GLuint locAtt1APD = -1;
@@ -65,14 +64,15 @@ GLuint locTexCoordDMM = -1;
 GLuint locmatrModelDMM = -1;
 GLuint locmatrVisuDMM = -1;
 GLuint locmatrProjDMM = -1;
-GLuint locTexDMM = -1;
+GLuint locTerrainTexDMM = -1;
+GLuint locWaterPosTexDMM = -1;
+GLuint locWaterHeightTexDMM = -1;
 // Locationss for DisplayTerrain shader
 GLuint locVertexDT = -1;
-GLuint locTexCoordDT = -1;
 GLuint locmatrModelDT = -1;
 GLuint locmatrVisuDT = -1;
 GLuint locmatrProjDT = -1;
-GLuint locTexDT = -1;
+GLuint locTerrainTexDT = -1;
 // Locations for RenderAA shader
 GLuint locVertexRAA = -1;
 GLuint locTexCoordRAA = -1;
@@ -95,13 +95,16 @@ GLint locmatrProjBase = -1;
 GLuint vao[NB_SHADERS];
 GLuint vbo[5];
 GLuint ubo[4];
-GLuint vbosQuad[2];
+GLuint vbosQuad[2]; /* Vertex & Tex Coord */
 GLuint vboPacket;
+GLuint vboHeightField;
+GLuint vboDMM[2]; /* Vertex & Index */
 
 // matrices de du pipeline graphique
 MatricePipeline matrModel;
 MatricePipeline matrVisu;
 MatricePipeline matrProj;
+MatricePipeline matrProjWide;
 
 // les formes
 FormeSphere *sphere = NULL, *sphereLumi = NULL;
@@ -126,6 +129,10 @@ FBO *posFBO;
 FBO *heightFBO;
 FBO *aaFBO;
 
+// Terrain mesh size
+const int terrainW = 1024;
+const int terrainH = 1024;
+
 // Wave Packets
 Packets *packets;
 int packetBudget = 10000;
@@ -134,6 +141,8 @@ int packetBudget = 10000;
  * vec4: x = amplitude, y = wavelength, z = phase offset, w = enveloppe size
  * vec4: for rendering x = center of wave bending circle*/
 GLfloat packetData[PACKET_GPU_BUFFER_SIZE * 3 * 4];
+
+int nIndexDMM = 0;
 
 ////////////////////////////////////////
 // déclaration des variables globales //
@@ -210,6 +219,8 @@ struct
 /* Forward declarations */
 void displayPacketOutlined(int count);
 void addPacketDisplacement(int count);
+void displayTerrain();
+void displayMicroMesh();
 
 
 void verifierAngles()
@@ -259,6 +270,7 @@ void updatePackets()
 
     // TODO Setup wide projection for InitiateWaveField (RasterizeWaveMeshPosition)
 
+    heightFBO->CommencerCapture();
     int displayedPackets = 0;
     int packetChunk =0;
     /* Standard wave packets */
@@ -279,7 +291,9 @@ void updatePackets()
             packetData[packetChunk++] = packets->m_packet[pk].envelope;
             /* Att2 */
             packetData[packetChunk++] = packets->m_packet[pk].bending;
-            packetChunk += 3; /* The last 3 elements aren't needed */
+            packetData[packetChunk++] = 0.0;
+            packetData[packetChunk++] = 0.0;
+            packetData[packetChunk++] = 0.0;
             displayedPackets++;
             if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
                 glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
@@ -310,7 +324,9 @@ void updatePackets()
         packetData[packetChunk++] = packets->m_ghostPacket[pk].envelope;
         /* Att2 */
         packetData[packetChunk++] = packets->m_ghostPacket[pk].bending;
-        packetChunk += 3; /* The last 3 elements aren't needed */
+        packetData[packetChunk++] = 0.0;
+        packetData[packetChunk++] = 0.0;
+        packetData[packetChunk++] = 0.0;
         displayedPackets++;
         if (packetChunk >= PACKET_GPU_BUFFER_SIZE * 3 * 4) {
             glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
@@ -328,6 +344,7 @@ void updatePackets()
     //displayPacketOutlined(packetChunk / 12);
     /* TODO EvaluatePackets(packetChunk) */
     addPacketDisplacement(packetChunk / 12);
+    heightFBO->TerminerCapture();
     /* TODO DisplayScene */
     /* TODO Get camera center */
 }
@@ -448,7 +465,6 @@ void chargerNuanceurs()
       locmatrModelRWMP = getloc( progRasterizeWaveMeshPosition, "matrModel" , LocUniform);
       locmatrVisuRWMP = getloc( progRasterizeWaveMeshPosition, "matrVisu" , LocUniform);
       locmatrProjRWMP = getloc( progRasterizeWaveMeshPosition, "matrProj" , LocUniform);
-      locTexRWMP = getloc( progRasterizeWaveMeshPosition, "tex" , LocUniform);
    }
 
    // Load AddPacketDisplacement shader
@@ -488,7 +504,9 @@ void chargerNuanceurs()
       locmatrModelDMM = getloc( progDisplayMicroMesh, "matrModel" , LocUniform);
       locmatrVisuDMM = getloc( progDisplayMicroMesh, "matrVisu" , LocUniform);
       locmatrProjDMM = getloc( progDisplayMicroMesh, "matrProj" , LocUniform);
-      locTexDMM = getloc( progDisplayMicroMesh, "tex" , LocUniform);
+      locTerrainTexDMM = getloc( progDisplayMicroMesh, "terrain" , LocUniform);
+      locWaterPosTexDMM = getloc( progDisplayMicroMesh, "waterPos" , LocUniform);
+      locWaterHeightTexDMM = getloc( progDisplayMicroMesh, "waterHeight" , LocUniform);
    }
 
    // Load DisplayTerrain shader
@@ -496,11 +514,10 @@ void chargerNuanceurs()
       const GLchar *shaders[3] = {"displayTerrain.vert", NULL, "displayTerrain.frag"};
       progDisplayTerrain = createShader(shaders);
       locVertexDT = getloc( progDisplayTerrain, "Vertex" , LocAttrib);
-      locTexCoordDT = getloc( progDisplayTerrain, "TexCoord" , LocAttrib);
       locmatrModelDT = getloc( progDisplayTerrain, "matrModel" , LocUniform);
       locmatrVisuDT = getloc( progDisplayTerrain, "matrVisu" , LocUniform);
       locmatrProjDT = getloc( progDisplayTerrain, "matrProj" , LocUniform);
-      locTexDT = getloc( progDisplayTerrain, "tex" , LocUniform);
+      locTerrainTexDT = getloc( progDisplayTerrain, "terrain" , LocUniform);
    }
 
    // Load RenderAA shader
@@ -588,6 +605,40 @@ void initPacketMesh()
 }
 
 
+void initHeightFieldMesh()
+{
+    GLfloat *data = new GLfloat[terrainW * terrainH * 6 * 2];
+    /* TODO Benchmark usefullness of parallel for */
+    #pragma omp parallel for
+    for (int y=0; y<terrainH; ++y) {
+        for (int x=0; x<terrainW; ++x) {
+            data[(y*terrainW + x) * 12 + 0] = 2.0 * (float)(x) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 1] = 2.0 * (float)(y) / terrainH - 1.0;
+            data[(y*terrainW + x) * 12 + 2] = 2.0 * (float)(x) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 3] = 2.0 * (float)(y+1) / terrainH - 1.0;
+            data[(y*terrainW + x) * 12 + 4] = 2.0 * (float)(x+1) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 5] = 2.0 * (float)(y) / terrainH - 1.0;
+            data[(y*terrainW + x) * 12 + 6] = 2.0 * (float)(x) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 7] = 2.0 * (float)(y+1) / terrainH - 1.0;
+            data[(y*terrainW + x) * 12 + 8] = 2.0 * (float)(x+1) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 9] = 2.0 * (float)(y+1) / terrainH - 1.0;
+            data[(y*terrainW + x) * 12 + 10] = 2.0 * (float)(x+1) / terrainW - 1.0;
+            data[(y*terrainW + x) * 12 + 11] = 2.0 * (float)(y) / terrainH - 1.0;
+        }
+    }
+
+    glGenBuffers(1, &vboHeightField);
+    glBindVertexArray(vao[DT_SHADER]);
+    glBindBuffer(GL_ARRAY_BUFFER, vboHeightField);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * terrainW * terrainH * 12, data, GL_STATIC_DRAW);
+    glVertexAttribPointer(locVertexDT, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(locVertexDT);
+
+    glBindVertexArray(0);
+    delete [] data;
+}
+
+
 // initialisation d'openGL
 void initialiser()
 {
@@ -605,7 +656,7 @@ void initialiser()
    packets = new Packets(packetBudget);
 
    // couleur de l'arrière-plan
-   glClearColor( 0.4, 0.2, 0.0, 1.0 );
+   glClearColor( 0.5, 0.6, 0.8, 0.0 );
 
    // activer les etats openGL
    glEnable( GL_DEPTH_TEST );
@@ -623,17 +674,7 @@ void initialiser()
    // Initialize VBOs
    initQuad();
    initPacketMesh();
-
-   // créer quelques autres formes
-   sphere = new FormeSphere( 1.0, 32, 32 );
-   sphereLumi = new FormeSphere( 0.5, 10, 10 );
-   theiere = new FormeTheiere( );
-   tore = new FormeTore( 0.4, 0.8, 32, 32 );
-   cylindre = new FormeCylindre( 0.3, 0.3, 3.0, 32, 32 );
-   cone = new FormeCylindre( 0.0, 0.5, 3.0, 32, 32 );
-
-   // Update display mesh and FBOs
-   // redimensionner();
+   initHeightFieldMesh();
 }
 
 void conclure()
@@ -654,14 +695,17 @@ void conclure()
    delete packets;
 }
 
-void drawQuad()
+/* TODO rename according to convention */
+void rasterizeWaveMeshPosition()
 {
     glUseProgram(progRasterizeWaveMeshPosition);
-    glUniformMatrix4fv( locmatrProjRWMP, 1, GL_FALSE, matrProj );
+    glUniformMatrix4fv( locmatrProjRWMP, 1, GL_FALSE, matrProjWide );
     glUniformMatrix4fv( locmatrVisuRWMP, 1, GL_FALSE, matrVisu );
     glUniformMatrix4fv( locmatrModelRWMP, 1, GL_FALSE, matrModel );
     glBindVertexArray(vao[RWMP_SHADER]);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 void displayPacketOutlined(int count)
@@ -690,6 +734,46 @@ void addPacketDisplacement(int count)
 }
 
 
+void displayTerrain()
+{
+    glUseProgram(progDisplayTerrain);
+    glBindVertexArray(vao[DT_SHADER]);
+    glUniformMatrix4fv(locmatrModelDT, 1, GL_FALSE, matrModel);
+    glUniformMatrix4fv(locmatrVisuDT, 1, GL_FALSE, matrVisu);
+    glUniformMatrix4fv(locmatrProjDT, 1, GL_FALSE, matrProj);
+    glActiveTexture(GL_TEXTURE0); /* Default value, can be omitted */
+    glBindTexture(GL_TEXTURE_2D, texTerrain);
+    glUniform1i(locTerrainTexDT, 0);
+    glDrawArrays(GL_TRIANGLES, 0, terrainW * terrainH * 12);
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+
+void displayMicroMesh()
+{
+    glUseProgram(progDisplayMicroMesh);
+    glBindVertexArray(vao[DMM_SHADER]);
+    glUniformMatrix4fv(locmatrModelDMM, 1, GL_FALSE, matrModel);
+    glUniformMatrix4fv(locmatrVisuDMM, 1, GL_FALSE, matrVisu);
+    glUniformMatrix4fv(locmatrProjDMM, 1, GL_FALSE, matrProj);
+    /* Setup textures */
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texTerrain);
+    glUniform1i(locTerrainTexDMM, 0);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, posFBO->GetRGBTex());
+    glUniform1i(locWaterPosTexDMM, 1);
+    glActiveTexture(GL_TEXTURE0 + 2);
+    glBindTexture(GL_TEXTURE_2D, heightFBO->GetRGBTex());
+    glUniform1i(locWaterHeightTexDMM, 2);
+
+    glDrawElements(GL_TRIANGLES, nIndexDMM, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+
 void afficherModele()
 {
    // Dessiner le modèle
@@ -702,40 +786,17 @@ void afficherModele()
       // mise à l'échelle
       matrModel.Scale( 5.0, 5.0, 5.0 );
 
-      glUniformMatrix4fv( locmatrModel, 1, GL_FALSE, matrModel );
+      posFBO->CommencerCapture();
+      rasterizeWaveMeshPosition();
+      posFBO->TerminerCapture();
+
       updatePackets();
+      displayTerrain();
+      displayMicroMesh();
+      // displayTerrain();
    } matrModel.PopMatrix();
 }
 
-void afficherLumiere()
-{
-   // Dessiner la lumiere
-
-   // tracer une ligne vers la source lumineuse
-   const GLfloat fact = 5.;
-   GLfloat coords[] =
-   {
-      LightSource[0].position.x                                    , LightSource[0].position.y                                    , LightSource[0].position.z,
-      LightSource[0].position.x+LightSource[0].spotDirection.x/fact, LightSource[0].position.y+LightSource[0].spotDirection.y/fact, LightSource[0].position.z+LightSource[0].spotDirection.z/fact
-   };
-   glLineWidth( 3.0 );
-   glVertexAttrib3f( locColorBase, 1.0, 1.0, 0.5 ); // jaune
-   glBindVertexArray( vao[1] );
-   matrModel.PushMatrix(); {
-      glBindBuffer( GL_ARRAY_BUFFER, vbo[4] );
-      glBufferSubData( GL_ARRAY_BUFFER, 0, sizeof(coords), coords );
-      glDrawArrays( GL_LINES, 0, 2 );
-   } matrModel.PopMatrix(); glUniformMatrix4fv( locmatrModelBase, 1, GL_FALSE, matrModel );
-   glBindVertexArray( 0 );
-   glLineWidth( 1.0 );
-
-   // tracer la source lumineuse
-   matrModel.PushMatrix(); {
-      matrModel.Translate( LightSource[0].position.x, LightSource[0].position.y, LightSource[0].position.z );
-      glUniformMatrix4fv( locmatrModelBase, 1, GL_FALSE, matrModel );
-      sphereLumi->afficher();
-   } matrModel.PopMatrix(); glUniformMatrix4fv( locmatrModelBase, 1, GL_FALSE, matrModel );
-}
 
 // fonction d'affichage
 void FenetreTP::afficherScene()
@@ -746,43 +807,20 @@ void FenetreTP::afficherScene()
    glUseProgram( progBase );
 
    // définir le pipeline graphique
-   if ( enPerspective )
-   {
-      matrProj.Perspective( 35.0, (GLdouble)largeur_ / (GLdouble)hauteur_,
-                            0.1, 300.0 );
-   }
-   else
-   {
-      const GLfloat d = 8.0;
-      if ( largeur_ <= hauteur_ )
-      {
-         matrProj.Ortho( -d, d,
-                         -d*(GLdouble)hauteur_ / (GLdouble)largeur_,
-                         d*(GLdouble)hauteur_ / (GLdouble)largeur_,
-                         0.1, 300.0 );
-      }
-      else
-      {
-         matrProj.Ortho( -d*(GLdouble)largeur_ / (GLdouble)hauteur_,
-                         d*(GLdouble)largeur_ / (GLdouble)hauteur_,
-                         -d, d,
-                         0.1, 300.0 );
-      }
-   }
+   matrProj.Perspective( 45.0, (GLdouble)largeur_ / (GLdouble)hauteur_, 0.5, 4000.0 );
+   matrProjWide.Perspective( 60.0, (GLdouble)largeur_ / (GLdouble)hauteur_, 0.1, 15000.0 );
    glUniformMatrix4fv( locmatrProjBase, 1, GL_FALSE, matrProj );
 
-   matrVisu.LookAt( 0.0, 3.0, distCam,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0 );
+   //matrVisu.LookAt( 0.0, 3.0, distCam,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0 );
+   matrVisu.LookAt( 10.17, 22.13, 59.49,  10.17, 21.66, 58.61,  0.0, 1.0, 0.0 );
+
    glUniformMatrix4fv( locmatrVisuBase, 1, GL_FALSE, matrVisu );
 
    matrModel.LoadIdentity();
    glUniformMatrix4fv( locmatrModelBase, 1, GL_FALSE, matrModel );
 
    // afficher les axes
-   if ( afficheAxes ) FenetreTP::afficherAxes( 8.0 );
-
-   // dessiner la scène
-   //glActiveTexture( GL_TEXTURE0 ); // activer la texture '0' (valeur de défaut)
-   glUniform1i( loclaTexture, 0 ); // '0' => utilisation de GL_TEXTURE0
+   if ( afficheAxes ) FenetreTP::afficherAxes( 1.0 );
 
    afficherModele();
 }
@@ -793,13 +831,49 @@ void FenetreTP::redimensionner( GLsizei w, GLsizei h )
    std::cout << "Resizing to " << w << "×" << h << std::endl;
    /* FIXME Is this function called on program start ? */
    glViewport( 0, 0, w, h );
-   /* TODO Create/resize display mesh */
    posFBO->Liberer();
    posFBO->Init(WAVETEX_WIDTH_FACTOR * w, WAVETEX_HEIGHT_FACTOR * h);
    heightFBO->Liberer();
    heightFBO->Init(WAVETEX_WIDTH_FACTOR * w, WAVETEX_HEIGHT_FACTOR * h);
    aaFBO->Liberer();
    aaFBO->Init(AA_OVERSAMPLE_FACTOR * w, AA_OVERSAMPLE_FACTOR * h);
+
+   /* Create/resize display mesh */
+   int meshW = WAVEMESH_WIDTH_FACTOR * w; /*Ça fait un gros mouton */
+   int meshH = WAVEMESH_HEIGHT_FACTOR * h;
+   GLfloat *mesh = new GLfloat[meshW * meshH * 2];
+   nIndexDMM = 3 * 2 * (meshW - 1) * (meshH -1);
+   GLuint *index = new GLuint[nIndexDMM];
+   #pragma omp parallel for
+   for (int y = 0; y < meshH; ++y) {
+       for (int x = 0; x < meshW; ++x) {
+           mesh[(y * meshW + x) * 2 + 0] = (x + 0.5) / meshW;
+           mesh[(y * meshW + x) * 2 + 1] = (y + 0.5) / meshH;
+       }
+   }
+   #pragma omp parallel for
+   for (int y = 0; y < meshH - 1; ++y) {
+       for (int x = 0; x < meshW - 1; ++x) {
+           index[(y * (meshW - 1) + x) * 6 + 0] = y * meshW + x;
+           index[(y * (meshW - 1) + x) * 6 + 1] = y * meshW + x + 1;
+           index[(y * (meshW - 1) + x) * 6 + 2] = (y + 1) * meshW + x;
+           index[(y * (meshW - 1) + x) * 6 + 3] = y * meshW + x + 1;
+           index[(y * (meshW - 1) + x) * 6 + 4] = (y + 1) * meshW + x + 1;
+           index[(y * (meshW - 1) + x) * 6 + 5] = (y + 1) * meshW + x;
+       }
+   }
+   glGenBuffers(2, vboDMM);
+   glBindVertexArray(vao[DMM_SHADER]);
+   glBindBuffer(GL_ARRAY_BUFFER, vboDMM[0]);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * meshW * meshH * 2, mesh, GL_STATIC_DRAW);
+   glVertexAttribPointer(locVertexDMM, 2, GL_FLOAT, GL_FALSE, 0, 0);
+   glEnableVertexAttribArray(locVertexDMM);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboDMM[1]);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * nIndexDMM, index, GL_STATIC_DRAW);
+   glBindVertexArray(0);
+
+   delete [] mesh;
+   delete [] index;
 }
 
 static void echoEtats( )

@@ -1,7 +1,5 @@
 #version 410
 
-uniform sampler2D tex;
-
 in Attribs {
     vec3 pos;
 } In;

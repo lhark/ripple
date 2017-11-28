@@ -90,8 +90,10 @@ void FBO::Init( int w, int h )
    // on veut des filtres de mignification et magnification de tpe NEAREST!
    glGenTextures(1, &m_Texture);
    glBindTexture(m_Target, m_Texture);
-   glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-   glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri( m_Target, GL_TEXTURE_WRAP_S, GL_CLAMP );
+   glTexParameteri( m_Target, GL_TEXTURE_WRAP_T, GL_CLAMP );
    glTexImage2D(m_Target, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
    // Créer une texture de profondeurs pour les couleurs avec L'ID m_Profondeur:
@@ -99,6 +101,8 @@ void FBO::Init( int w, int h )
    glBindTexture(m_Target, m_Profondeur);
    glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
    glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glTexParameteri( m_Target, GL_TEXTURE_WRAP_S, GL_CLAMP );
+   glTexParameteri( m_Target, GL_TEXTURE_WRAP_T, GL_CLAMP );
    glTexImage2D(m_Target, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 

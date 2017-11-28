@@ -16,7 +16,7 @@ out Attribs {
 
 void main(void)
 {
-    Out.pos = 0.5 * SCENE_EXTENT * vec3(Vertex.x, Vertex.y, 0);
-    gl_Position = matrProj * matrVisu * vec4(Out.pos, 1.);
+    Out.pos = 0.5 * SCENE_EXTENT * vec3(Vertex.x, 0, Vertex.y);
+    gl_Position = matrProj * matrVisu * matrModel * vec4(Out.pos, 1.);
 }
 

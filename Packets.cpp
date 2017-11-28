@@ -127,6 +127,12 @@ Packets::Packets(int packetBudget)
 	auto width = *reinterpret_cast<uint32_t *>(&info[18]);
 	auto height = *reinterpret_cast<uint32_t *>(&info[22]);
 	auto depth = *reinterpret_cast<uint16_t *>(&info[28]);
+	printf("Loading %s:\n", groundTexFile);
+	printf("  fileSize = %d\n", fileSize);
+	printf("  dataOffset = %d\n", dataOffset);
+	printf("  width = %d\n", width);
+	printf("  height = %d\n", height);
+	printf("  depth = %d\n", depth);
 
 	if (info[0] != 'B' || info[1] != 'M') {
 		fclose(f);
@@ -175,16 +181,16 @@ Packets::Packets(int packetBudget)
 		{
 			// if we are at the boundary, intialize the distance function with 0, otherwise with maximum value
 			if ((bound[y*m_groundSizeX + x] > 0.5f) &&
-				((bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] <= 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 1))] <= 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y - 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] <= 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x - 1))] <= 0.5f)))
+				((bound[max(0, min(m_groundSizeY - 1, y + 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] <= 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 1))] <= 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y - 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] <= 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x - 1))] <= 0.5f)))
 				pMap[y*m_groundSizeX + x] = 0;  // initialize with maximum x distance
 			else if ((bound[y*m_groundSizeX + x] <= 0.5f) &&
-				((bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] > 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 1))] > 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y - 1))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x + 0))] > 0.5f)
-					|| (bound[max<int>(0, min<float>(m_groundSizeY - 1, y + 0))*m_groundSizeX + max<int>(0, min<float>(m_groundSizeX - 1, x - 1))] > 0.5f)))
+				((bound[max(0, min(m_groundSizeY - 1, y + 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] > 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 1))] > 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y - 1))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x + 0))] > 0.5f)
+					|| (bound[max(0, min(m_groundSizeY - 1, y + 0))*m_groundSizeX + max(0, min(m_groundSizeX - 1, x - 1))] > 0.5f)))
 				pMap[y*m_groundSizeX + x] = 0;  // initialize with maximum x distance
 			else
 				pMap[y*m_groundSizeX + x] = m_groundSizeX*m_groundSizeX;  // initialize with maximum x distance
@@ -202,7 +208,7 @@ Packets::Packets(int packetBudget)
 		{
 			if (pMap[y*m_groundSizeX+x] == 0)
 				lastBoundX = x;
-			pMap[y*m_groundSizeX+x] = min<float>(pMap[y*m_groundSizeX+x], (x-lastBoundX)*(x-lastBoundX));
+			pMap[y*m_groundSizeX+x] = min(pMap[y*m_groundSizeX+x], (x-lastBoundX)*(x-lastBoundX));
 		}
 	}
 	#pragma omp parallel for
@@ -213,7 +219,7 @@ Packets::Packets(int packetBudget)
 		{
 			if (pMap[y*m_groundSizeX+x] == 0)
 				lastBoundX = x;
-			pMap[y*m_groundSizeX+x] = min<float>(pMap[y*m_groundSizeX+x], (lastBoundX-x)*(lastBoundX-x));
+			pMap[y*m_groundSizeX+x] = min(pMap[y*m_groundSizeX+x], (lastBoundX-x)*(lastBoundX-x));
 		}
 	}
 	#pragma omp parallel for
@@ -223,13 +229,13 @@ Packets::Packets(int packetBudget)
 			int minDist = pMap[y*m_groundSizeX+x];
 			for (int yd=1; yd+y<=m_groundSizeY-1; yd++)
 			{
-				minDist = min<float>(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
+				minDist = min(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
 				if (minDist < yd*yd)
 					break;
 			}
 			for (int yd=-1; yd+y>=0; yd--)
 			{
-				minDist = min<float>(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
+				minDist = min(minDist, yd*yd+pMap[(y+yd)*m_groundSizeX+x]);
 				if (minDist < yd*yd)
 					break;
 			}
@@ -255,11 +261,11 @@ Packets::Packets(int packetBudget)
 	for (int y=0; y<m_groundSizeY; y++)
 		for (int x=0; x<m_groundSizeX; x++)
 		{
-			float dx = m_distMap[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+1))] - m_distMap[y*m_groundSizeX + x];
-			float dy = m_distMap[max<int>(0,min<float>(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + x];
+			float dx = m_distMap[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x+1))] - m_distMap[y*m_groundSizeX + x];
+			float dy = m_distMap[max(0,min(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + x];
 			Vector2f dV = Vector2f(dx,dy);
-			dx = m_distMap[y*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x-1))];
-			dy = m_distMap[y*m_groundSizeX + x] - m_distMap[max<int>(0,min<float>(m_groundSizeY-1,y-1))*m_groundSizeX + x];
+			dx = m_distMap[y*m_groundSizeX + x] - m_distMap[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x-1))];
+			dy = m_distMap[y*m_groundSizeX + x] - m_distMap[max(0,min(m_groundSizeY-1,y-1))*m_groundSizeX + x];
 			dV += Vector2f(dx,dy);
 			m_bndDeriv[y*m_groundSizeX+x] = Vector2f(0,0);
 			if ((dV.x() != 0) || (dV.y() != 0))
@@ -285,7 +291,7 @@ Packets::Packets(int packetBudget)
 								w = 4.0/16.0;
 							else if ((abs(dy) == 0) || (abs(dx) == 0))
 								w = 2.0/16.0;
-							dV += w*m_bndDeriv[max<int>(0,min<float>(m_groundSizeY-1,y+dy))*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+dx))];
+							dV += w*m_bndDeriv[max(0,min(m_groundSizeY-1,y+dy))*m_groundSizeX + max(0,min(m_groundSizeX-1,x+dx))];
 						}
 				if ((dV.x() != 0) || (dV.y() != 0))
 					m_bndDerivH[y*m_groundSizeX+x] = dV.normalized();
@@ -303,11 +309,11 @@ Packets::Packets(int packetBudget)
 	for (int y=0; y<m_groundSizeY; y++)
 		for (int x=0; x<m_groundSizeX; x++)
 		{
-			float dx = m_ground[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x+1))] - m_ground[y*m_groundSizeX + x];
-			float dy = m_ground[max<int>(0,min<float>(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_ground[y*m_groundSizeX + x];
+			float dx = m_ground[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x+1))] - m_ground[y*m_groundSizeX + x];
+			float dy = m_ground[max(0,min(m_groundSizeY-1,y+1))*m_groundSizeX + x] - m_ground[y*m_groundSizeX + x];
 			Vector2f dV = Vector2f(dx,dy);
-			dx = m_ground[y*m_groundSizeX + x] - m_ground[y*m_groundSizeX + max<int>(0,min<float>(m_groundSizeX-1,x-1))];
-			dy = m_ground[y*m_groundSizeX + x] - m_ground[max<int>(0,min<float>(m_groundSizeY-1,y-1))*m_groundSizeX + x];
+			dx = m_ground[y*m_groundSizeX + x] - m_ground[y*m_groundSizeX + max(0,min(m_groundSizeX-1,x-1))];
+			dy = m_ground[y*m_groundSizeX + x] - m_ground[max(0,min(m_groundSizeY-1,y-1))*m_groundSizeX + x];
 			dV += Vector2f(dx,dy);
 			m_gndDeriv[y*m_groundSizeX+x] = Vector2f(0,0);
 			if ((dV.x() != 0) || (dV.y() != 0))
@@ -477,8 +483,8 @@ void Packets::DeleteGhost(int id)
 void Packets::CreatePacket(float pos1x, float pos1y, float pos2x, float pos2y, float dir1x, float dir1y, float dir2x, float dir2y, float k_L, float k_H, float E)
 {
 	// make sure we have enough memory
-	if ( max<float>(m_usedPackets, m_usedGhosts) + 10 > m_packetNum)
-		ExpandWavePacketMemory(max<float>(m_usedPackets,m_usedGhosts) + PACKET_BUFFER_DELTA);
+	if ( max(m_usedPackets, m_usedGhosts) + 10 > m_packetNum)
+		ExpandWavePacketMemory(max(m_usedPackets,m_usedGhosts) + PACKET_BUFFER_DELTA);
 	float speedDummy, kDummy;
 	int	firstfree = GetFreePackedID();
 	m_packet[firstfree].pos1 =  Vector2f(pos1x,pos1y);
@@ -957,8 +963,8 @@ void Packets::AdvectWavePackets(float dTime)
 
 
 	// wavenumber interval subdivision if travel distance between fastest and slowest wave packets differ more than PACKET_SPLIT_DISPERSION x envelope size
-	if ( max<float>(m_usedGhosts + m_usedPackets, 2*m_usedPackets) > m_packetNum)
-		ExpandWavePacketMemory(max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
+	if ( max(m_usedGhosts + m_usedPackets, 2*m_usedPackets) > m_packetNum)
+		ExpandWavePacketMemory(max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
 	#pragma omp parallel for
 	for (int uP = m_usedPackets-1; uP>=0; uP--)
 		if (!m_packet[m_usedPacket[uP]].use3rd)
@@ -1036,8 +1042,8 @@ void Packets::AdvectWavePackets(float dTime)
 
 
 	// crest-refinement of packets of regular packet (not at any boundary, i.e. having no 3rd vertex)
-	if (max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) > m_packetNum)
-		ExpandWavePacketMemory(max<float>(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
+	if (max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) > m_packetNum)
+		ExpandWavePacketMemory(max(m_usedGhosts + m_usedPackets, 2 * m_usedPackets) + PACKET_BUFFER_DELTA);
 	#pragma omp parallel for
 	for (int uP = m_usedPackets-1; uP>=0; uP--)
 		if (!m_packet[m_usedPacket[uP]].use3rd)

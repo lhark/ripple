@@ -43,7 +43,7 @@ void main(void)
     Out.Pos = vec4(-1, -1, -In[0].Att1.w, -In[0].Att1.w);
     gl_Position = matrProj * matrVisu * matrModel * p2;
     EmitVertex();
-    Out.Pos = vec4(1, 1, -In[0].Att1.w, 0);
+    Out.Pos = vec4(1, 1, In[0].Att1.w, 0);
     gl_Position = matrProj * matrVisu * matrModel * p3;
     EmitVertex();
     Out.Pos = vec4(1, -1, In[0].Att1.w, -In[0].Att1.w);
