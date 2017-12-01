@@ -7,8 +7,8 @@ uniform mat4 matrProj;
 
 /////////////////////////////////////////////////////////////////
 
-layout(location=0) in vec2 Vertex;
-layout(location=8) in vec2 TexCoord;
+in vec2 Vertex;
+in vec2 TexCoord;
 
 out Attribs {
     vec3 pos;

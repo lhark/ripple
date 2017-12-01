@@ -23,4 +23,5 @@ void main(void)
     vec3 ripple = (1.0 + cos(In.Pos.x * PI)) * (1.0 + cos(In.Pos.y * PI)) * In.Att1.x *
                   vec3(0, cos(phase), 0);
     Color = vec4(ripple, 1);
+    //Color = vec4(0, In.Att1.w, 0, 1);
 }

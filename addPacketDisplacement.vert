@@ -8,8 +8,8 @@ uniform mat4 matrProj;
 /////////////////////////////////////////////////////////////////
 
 layout(location=0) in vec4 Pos;
-layout(location=4) in vec4 Att1;
-layout(location=8) in vec4 Att2;
+layout(location=1) in vec4 Att1;
+layout(location=2) in vec4 Att2;
 
 out Attribs {
     vec4 Pos;

@@ -143,7 +143,7 @@ const int terrainH = 1024;
 
 // Wave Packets
 Packets *packets;
-int packetBudget = 10000;
+int packetBudget = 100000;
 /* Wave packets:
  * vec4: xy = position, zw = direction
  * vec4: x = amplitude, y = wavelength, z = phase offset, w = enveloppe size
@@ -151,6 +151,9 @@ int packetBudget = 10000;
 GLfloat packetData[PACKET_GPU_BUFFER_SIZE * 3 * 4];
 
 int nIndexDMM = 0;
+
+bool debug = false;
+int printonce = 0;
 
 ////////////////////////////////////////
 // déclaration des variables globales //
@@ -247,26 +250,6 @@ void verifierAngles()
 
 void calculerPhysique( )
 {
-   if ( /* enmouvement */ false)
-   {
-      static int sensTheta = 1;
-      static int sensPhi = 1;
-      thetaCam += 0.3 * sensTheta;
-      phiCam += 0.5 * sensPhi;
-      //if ( thetaCam <= 0. || thetaCam >= 360.0 ) sensTheta = -sensTheta;
-      if ( phiCam < -90.0 || phiCam > 90.0 ) sensPhi = -sensPhi;
-
-      static int sensAngle = 1;
-      LightSource[0].spotAngle += sensAngle * 0.3;
-      if ( LightSource[0].spotAngle < 5.0 ) sensAngle = -sensAngle;
-      if ( LightSource[0].spotAngle > 60.0 ) sensAngle = -sensAngle;
-
-      // De temps à autre, alterner entre le modèle d'illumination: Lambert, Gouraud, Phong
-      static float type = 0;
-      type += 0.005;
-      varsUnif.typeIllumination = fmod(type,3);
-   }
-
    verifierAngles();
 }
 
@@ -279,7 +262,8 @@ void updatePackets()
 
     // TODO Setup wide projection for InitiateWaveField (RasterizeWaveMeshPosition)
 
-    heightFBO->CommencerCapture();
+    if (!debug)
+        heightFBO->CommencerCapture();
     int displayedPackets = 0;
     int packetChunk =0;
     /* Standard wave packets */
@@ -317,6 +301,7 @@ void updatePackets()
             }
         }
     }
+    printonce++;
     // printf("PacketData[0] = %f , %f\n", packetData[0], packetData[1]);
     /* Ghost packets */
     for (int i = 0; i < packets->m_usedGhosts; ++i) {
@@ -354,8 +339,9 @@ void updatePackets()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     //displayPacketOutlined(packetChunk / 12);
     /* TODO EvaluatePackets(packetChunk) */
-    addPacketDisplacement(packetChunk / 12);
-    heightFBO->TerminerCapture();
+    addPacketDisplacement(displayedPackets);
+    if (!debug)
+        heightFBO->TerminerCapture();
     /* TODO DisplayScene */
     /* TODO Get camera center */
 }
@@ -490,7 +476,6 @@ void chargerNuanceurs()
       locmatrModelAPD = getloc( progAddPacketDisplacement, "matrModel" , LocUniform);
       locmatrVisuAPD = getloc( progAddPacketDisplacement, "matrVisu" , LocUniform);
       locmatrProjAPD = getloc( progAddPacketDisplacement, "matrProj" , LocUniform);
-      locTexAPD = getloc( progAddPacketDisplacement, "tex" , LocUniform);
    }
 
    // Load DisplayPacketOutlined shader
@@ -596,8 +581,8 @@ void initPacketMesh()
     glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
     glBufferData(GL_ARRAY_BUFFER, sizeof(packetData), NULL, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(locPosAPD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)0);
-    glVertexAttribPointer(locAtt1APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)4);
-    glVertexAttribPointer(locAtt2APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)8);
+    glVertexAttribPointer(locAtt1APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)(4*sizeof(GLfloat)));
+    glVertexAttribPointer(locAtt2APD, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)(8*sizeof(GLfloat)));
     glEnableVertexAttribArray(locPosAPD);
     glEnableVertexAttribArray(locAtt1APD);
     glEnableVertexAttribArray(locAtt2APD);
@@ -606,8 +591,8 @@ void initPacketMesh()
     glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
     /* No need to initialize the buffer a second time */
     glVertexAttribPointer(locPosDPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)0);
-    glVertexAttribPointer(locAtt1DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)4);
-    glVertexAttribPointer(locAtt2DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)8);
+    glVertexAttribPointer(locAtt1DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)(4*sizeof(GLfloat)));
+    glVertexAttribPointer(locAtt2DPO, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 12, (void*)(8*sizeof(GLfloat)));
     glEnableVertexAttribArray(locPosDPO);
     glEnableVertexAttribArray(locAtt1DPO);
     glEnableVertexAttribArray(locAtt2DPO);
@@ -807,7 +792,8 @@ void afficherModele()
       updatePackets();
       glClearColor( 0.5, 0.6, 0.8, 0.0 );
       displayTerrain();
-      displayMicroMesh();
+      if (!debug)
+          displayMicroMesh();
    } matrModel.PopMatrix();
 }
 
@@ -958,6 +944,11 @@ void FenetreTP::clavier( TP_touche touche )
       goD = 1;
       break;
 
+   case TP_h:
+      debug = !debug;
+      printf("Debug is %s!\n", (debug ? "active" : "inactive"));
+      break;
+
    case TP_x: // Activer/désactiver l'affichage des axes
       afficheAxes = !afficheAxes;
       std::cout << "// Affichage des axes ? " << ( afficheAxes ? "OUI" : "NON" ) << std::endl;
@@ -969,20 +960,29 @@ void FenetreTP::clavier( TP_touche touche )
       break;
 
    case TP_r:
+      packets->Reset();
+      printonce = 0;
+      printf("Reseting...\n");
+      break;
+
+   case TP_e:
        // Send one wave front "One ping only."
        packets->CreateCircularWavefront(0.0, 0.0, 2.0, 0.2, 1.0, 10000);
+      printonce = 0;
        printf("Sending a circular wavefront...\n");
       break;
 
    case TP_f:
        // Send one wave front "One ping only."
        packets->CreateLinearWavefront(0.0, 0.0, 1.0, 0.0, 2.0, 0.2, 1.0, 10000);
+      printonce = 0;
        printf("Sending a linear wavefront...\n");
       break;
 
    case TP_a:
        // Send one packet
        packets->CreateSpreadingPacket(0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 0.2, 1.0, 10000);
+      printonce = 0;
        printf("Sending a spreading packet...\n");
       break;
 
@@ -997,6 +997,7 @@ void FenetreTP::clavier( TP_touche touche )
 
    case TP_p: // Permuter la rotation automatique du modèle
       enmouvement = !enmouvement;
+      printf("Simulation %s\n", (enmouvement ? "running" : "stopped"));
       break;
 
    default:
