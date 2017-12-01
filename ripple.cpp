@@ -84,7 +84,6 @@ GLuint locTexRAA = -1;
 GLuint indLightSource;
 GLuint indFrontMaterial;
 GLuint indLightModel;
-GLuint indvarsUnif;
 GLuint progBase;  // le programme de nuanceurs de base
 GLint locVertexBase = -1;
 GLint locColorBase = -1;
@@ -114,7 +113,7 @@ FormeCylindre *cylindre = NULL;
 FormeCylindre *cone = NULL;
 
 // variables pour définir le point de vue
-double thetaCam = 0.0;        // angle de rotation de la caméra (coord. sphériques)
+double thetaCam = 180.0;        // angle de rotation de la caméra (coord. sphériques)
 double phiCam = 0.0;          // angle de rotation de la caméra (coord. sphériques)
 double distCam = 0.0;         // distance (coord. sphériques)
 glm::vec3 cameraPos = glm::vec3(10.17, 22.13, 59.49);
@@ -159,73 +158,8 @@ int printonce = 0;
 // déclaration des variables globales //
 ////////////////////////////////////////
 
-// partie 1: illumination
-int modele = 1;                  // le modèle à afficher
-
-// partie 3: texture
+/* Heightmap for the terrain */
 GLuint texTerrain = 0;
-GLuint textureECHIQUIER = 0;
-
-// définition des lumières
-struct LightSourceParameters
-{
-   glm::vec4 ambient;
-   glm::vec4 diffuse;
-   glm::vec4 specular;
-   glm::vec4 position;
-   glm::vec3 spotDirection;
-   float spotExposant;
-   float spotAngle;            // ([0.0,90.0] ou 180.0)
-   float constantAttenuation;
-   float linearAttenuation;
-   float quadraticAttenuation;
-} LightSource[1] = { { glm::vec4( 1.0, 1.0, 1.0, 1.0 ),
-                       glm::vec4( 1.0, 1.0, 1.0, 1.0 ),
-                       glm::vec4( 1.0, 1.0, 1.0, 1.0 ),
-                       glm::vec4( 4, 1, 15, 1.0 ),
-                       glm::vec3( -5.0, -2.0, -10.0 ),
-                       1.0,       // l'exposant du cône
-                       15.0,      // l'angle du cône du spot
-                       1., 0., 0. } };
-
-// définition du matériau
-struct MaterialParameters
-{
-   glm::vec4 emission;
-   glm::vec4 ambient;
-   glm::vec4 diffuse;
-   glm::vec4 specular;
-   float shininess;
-} FrontMaterial = { glm::vec4( 0.0, 0.0, 0.0, 1.0 ),
-                    glm::vec4( 0.1, 0.1, 0.1, 1.0 ),
-                    glm::vec4( 1.0, 0.1, 1.0, 1.0 ),
-                    glm::vec4( 1.0, 1.0, 1.0, 1.0 ),
-                    100.0 };
-
-struct LightModelParameters
-{
-   glm::vec4 ambient; // couleur ambiante
-   int localViewer;   // doit-on prendre en compte la position de l'observateur? (local ou à l'infini)
-   int twoSide;       // éclairage sur les deux côtés ou un seul?
-} LightModel = { glm::vec4(0,0,0,1), false, false };
-
-struct
-{
-   // partie 1: illumination
-   int typeIllumination;     // 0:Lambert, 1:Gouraud, 2:Phong
-   int utiliseBlinn;         // indique si on veut utiliser modèle spéculaire de Blinn ou Phong
-   int utiliseDirect;        // indique si on utilise un spot style Direct3D ou OpenGL
-   int afficheNormales;      // indique si on utilise les normales comme couleurs (utile pour le débogage)
-   // partie 3: texture
-   int texnumero;            // numéro de la texture appliquée
-   int utiliseCouleur;       // doit-on utiliser la couleur de base de l'objet en plus de celle de la texture?
-   int afficheTexelNoir;     // un texel noir doit-il être affiché 0:noir, 1:mi-coloré, 2:transparent?
-} varsUnif = { 2, false, false, false,
-               0, true, 0 };
-// ( En glsl, les types 'bool' et 'int' sont de la même taille, ce qui n'est pas le cas en C++.
-// Ci-dessus, on triche donc un peu en déclarant les 'bool' comme des 'int', mais ça facilite la
-// copie directe vers le nuanceur où les variables seront bien de type 'bool'. )
-
 
 /* Forward declarations */
 void displayPacketOutlined(int count);
@@ -638,11 +572,6 @@ void initHeightFieldMesh()
 // initialisation d'openGL
 void initialiser()
 {
-   // donner l'orientation du modèle
-   thetaCam = 0.0;
-   phiCam = 0.0;
-   distCam = 90.0;
-
    // Create FBOs
    posFBO = new FBO();
    heightFBO = new FBO();
@@ -726,9 +655,11 @@ void addPacketDisplacement(int count)
     glUniformMatrix4fv(locmatrVisuAPD, 1, GL_FALSE, matrVisu);
     glUniformMatrix4fv(locmatrProjAPD, 1, GL_FALSE, matrProjWide);
     glEnable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
     glBlendFunc(GL_ONE, GL_ONE);
     glBlendEquation(GL_FUNC_ADD);
     glDrawArrays(GL_POINTS, 0, count);
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glBindVertexArray(0);
     glUseProgram(0);
@@ -1040,14 +971,9 @@ void FenetreTP::sourisClic( int button, int state, int x, int y )
    }
 }
 
-void FenetreTP::sourisWheel( int x, int y ) // Changer la taille du spot
-{
-   const int sens = +1;
-   LightSource[0].spotAngle += sens*y;
-   if ( LightSource[0].spotAngle > 90.0 ) LightSource[0].spotAngle = 90.0;
-   if ( LightSource[0].spotAngle < 0.0 ) LightSource[0].spotAngle = 0.0;
-   std::cout <<  " spotAngle=" << LightSource[0].spotAngle << std::endl;
-}
+
+void FenetreTP::sourisWheel(int x, int y) {}
+
 
 // fonction de mouvement de la souris
 void FenetreTP::sourisMouvement( int x, int y )
@@ -1062,18 +988,6 @@ void FenetreTP::sourisMouvement( int x, int y )
          thetaCam -= dx / 9.0;
          phiCam   -= dy / 9.0;
          break;
-      case deplaceSpotDirection:
-         LightSource[0].spotDirection.x += 0.06 * dx;
-         LightSource[0].spotDirection.y -= 0.06 * dy;
-         // std::cout << " LightSource[0].spotDirection=" << glm::to_string(LightSource[0].spotDirection) << std::endl;
-         break;
-      case deplaceSpotPosition:
-         LightSource[0].position.x += 0.03 * dx;
-         LightSource[0].position.y -= 0.03 * dy;
-         // std::cout << " LightSource[0].position=" << glm::to_string(LightSource[0].position) << std::endl;
-         //glm::vec3 ecranPos( x, hauteur_-y, ecranLumi[2] );
-         //LightSource[0].position = glm::vec4(glm::unProject( ecranPos, VM, P, cloture ), 1.0);
-         break;
       }
 
       dernierX = x;
@@ -1086,7 +1000,7 @@ void FenetreTP::sourisMouvement( int x, int y )
 int main( int argc, char *argv[] )
 {
    // créer une fenêtre
-   FenetreTP fenetre( "INF2705 TP" );
+   FenetreTP fenetre( "Ripple" );
 
    // allouer des ressources et définir le contexte OpenGL
    initialiser();
