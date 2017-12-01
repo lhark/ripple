@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <stack>
 
@@ -42,6 +43,8 @@ public:
 
    void LookAt( GLdouble obsX, GLdouble obsY, GLdouble obsZ, GLdouble versX, GLdouble versY, GLdouble versZ, GLdouble upX, GLdouble upY, GLdouble upZ )
    { matr_.top() = glm::lookAt( glm::vec3( obsX, obsY, obsZ ), glm::vec3( versX, versY, versZ ), glm::vec3( upX, upY, upZ ) ); }
+   void LookAt( glm::vec3 obs, glm::vec3 vers, glm::vec3 up )
+   { matr_.top() = glm::lookAt(obs, vers, up); }
    void Frustum( GLdouble gauche, GLdouble droite, GLdouble bas, GLdouble haut, GLdouble planAvant, GLdouble planArriere )
    { matr_.top() = glm::frustum( gauche, droite, bas, haut, planAvant, planArriere ); }
    void Perspective( GLdouble fovy, GLdouble aspect, GLdouble planAvant, GLdouble planArriere )
@@ -315,6 +318,7 @@ typedef enum {
    TP_BARREOBLIQUE  = GLFW_KEY_SLASH,
    TP_ESPACE        = GLFW_KEY_SPACE,
    TP_SOULIGNE      = '_', // GLFW_KEY_UNDERSCORE,
+   TP_CONTROLEGAUCHE= GLFW_KEY_LEFT_CONTROL,
 
    TP_0 = GLFW_KEY_0,
    TP_1 = GLFW_KEY_1,
@@ -378,6 +382,7 @@ typedef enum {
    TP_BARREOBLIQUE  = SDLK_SLASH,
    TP_ESPACE        = SDLK_SPACE,
    TP_SOULIGNE      = SDLK_UNDERSCORE,
+   TP_CONTROLEGAUCHE= SDLK_LCTRL,
 
    TP_0 = SDLK_0,
    TP_1 = SDLK_1,
@@ -611,6 +616,8 @@ public:
    void redimensionner( GLsizei w, GLsizei h );
    // fonction appelée lors d'un événement de clavier
    void clavier( TP_touche touche );
+   // fonction appelée lors d'un événement de clavier relaché
+   void clavierRelache( TP_touche touche );
    // fonctions appelées lors d'un événement de souris
    void sourisClic( int button, int state, int x, int y );
    void sourisWheel( int x, int y );
@@ -650,6 +657,7 @@ public:
             clavier( (TP_touche) e.key.keysym.sym );
             break;
          case SDL_KEYUP: // une touche est relâchée
+            clavierRelache( (TP_touche) e.key.keysym.sym );
             break;
          case SDL_MOUSEBUTTONDOWN: // un bouton de la souris est pressé
          case SDL_MOUSEBUTTONUP: // un bouton de la souris est relâché

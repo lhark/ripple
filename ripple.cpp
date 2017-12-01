@@ -117,10 +117,18 @@ FormeCylindre *cone = NULL;
 double thetaCam = 0.0;        // angle de rotation de la caméra (coord. sphériques)
 double phiCam = 0.0;          // angle de rotation de la caméra (coord. sphériques)
 double distCam = 0.0;         // distance (coord. sphériques)
+glm::vec3 cameraPos = glm::vec3(10.17, 22.13, 59.49);
+float movementIncr = 0.8;
+float goF = 0; /* Forward */
+float goR = 0; /* Right */
+float goB = 0; /* Back */
+float goL = 0; /* Left */
+float goU = 0; /* Up */
+float goD = 0; /* Down */
 
 // variables d'état
 bool enPerspective = false;   // indique si on est en mode Perspective (true) ou Ortho (false)
-bool enmouvement = false;     // le modèle est en mouvement/rotation automatique ou non
+bool enmouvement = true;     // le modèle est en mouvement/rotation automatique ou non
 bool afficheAxes = true;      // indique si on affiche les axes
 GLenum modePolygone = GL_FILL; // comment afficher les polygones
 
@@ -239,7 +247,7 @@ void verifierAngles()
 
 void calculerPhysique( )
 {
-   if ( enmouvement )
+   if ( /* enmouvement */ false)
    {
       static int sensTheta = 1;
       static int sensPhi = 1;
@@ -266,7 +274,8 @@ void calculerPhysique( )
 void updatePackets()
 {
     // Compute wave packets
-    packets->AdvectWavePackets(INIT_WAVE_SPEED);
+    if (enmouvement)
+        packets->AdvectWavePackets(INIT_WAVE_SPEED);
 
     // TODO Setup wide projection for InitiateWaveField (RasterizeWaveMeshPosition)
 
@@ -302,7 +311,8 @@ void updatePackets()
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
                 //displayPacketOutlined(packetChunk / 12);
                 /* TODO EvaluatePackets(packetChunk) */
-                addPacketDisplacement(packetChunk / 12);
+                addPacketDisplacement(displayedPackets);
+                displayedPackets = 0;
                 packetChunk = 0;
             }
         }
@@ -334,7 +344,8 @@ void updatePackets()
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             //displayPacketOutlined();
             /* TODO EvaluatePackets(packetChunk) */
-            addPacketDisplacement(packetChunk / 12);
+            addPacketDisplacement(displayedPackets);
+            displayedPackets = 0;
             packetChunk = 0;
         }
     }
@@ -695,10 +706,10 @@ void conclure()
    delete packets;
 }
 
-/* TODO rename according to convention */
 void rasterizeWaveMeshPosition()
 {
     glUseProgram(progRasterizeWaveMeshPosition);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glUniformMatrix4fv( locmatrProjRWMP, 1, GL_FALSE, matrProjWide );
     glUniformMatrix4fv( locmatrVisuRWMP, 1, GL_FALSE, matrVisu );
     glUniformMatrix4fv( locmatrModelRWMP, 1, GL_FALSE, matrModel );
@@ -724,11 +735,16 @@ void displayPacketOutlined(int count)
 void addPacketDisplacement(int count)
 {
     glUseProgram(progAddPacketDisplacement);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glBindVertexArray(vao[APD_SHADER]);
     glUniformMatrix4fv(locmatrModelAPD, 1, GL_FALSE, matrModel);
     glUniformMatrix4fv(locmatrVisuAPD, 1, GL_FALSE, matrVisu);
-    glUniformMatrix4fv(locmatrProjAPD, 1, GL_FALSE, matrProj);
+    glUniformMatrix4fv(locmatrProjAPD, 1, GL_FALSE, matrProjWide);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendEquation(GL_FUNC_ADD);
     glDrawArrays(GL_POINTS, 0, count);
+    glDisable(GL_BLEND);
     glBindVertexArray(0);
     glUseProgram(0);
 }
@@ -779,21 +795,19 @@ void afficherModele()
    // Dessiner le modèle
    matrModel.PushMatrix(); {
 
-      // appliquer les rotations
-      matrModel.Rotate( phiCam, -1.0, 0.0, 0.0 );
-      matrModel.Rotate( thetaCam, 0.0, -1.0, 0.0 );
 
       // mise à l'échelle
       matrModel.Scale( 5.0, 5.0, 5.0 );
 
+      /* Create texture terrain positions */
       posFBO->CommencerCapture();
       rasterizeWaveMeshPosition();
       posFBO->TerminerCapture();
 
       updatePackets();
+      glClearColor( 0.5, 0.6, 0.8, 0.0 );
       displayTerrain();
       displayMicroMesh();
-      // displayTerrain();
    } matrModel.PopMatrix();
 }
 
@@ -807,12 +821,20 @@ void FenetreTP::afficherScene()
    glUseProgram( progBase );
 
    // définir le pipeline graphique
-   matrProj.Perspective( 45.0, (GLdouble)largeur_ / (GLdouble)hauteur_, 0.5, 4000.0 );
+   matrProj.Perspective( 30.0, (GLdouble)largeur_ / (GLdouble)hauteur_, 0.5, 4000.0 );
    matrProjWide.Perspective( 60.0, (GLdouble)largeur_ / (GLdouble)hauteur_, 0.1, 15000.0 );
    glUniformMatrix4fv( locmatrProjBase, 1, GL_FALSE, matrProj );
 
    //matrVisu.LookAt( 0.0, 3.0, distCam,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0 );
-   matrVisu.LookAt( 10.17, 22.13, 59.49,  10.17, 21.66, 58.61,  0.0, 1.0, 0.0 );
+   // appliquer les rotations
+   glm::vec3 view = glm::vec3(0.0, 0.0, 1.0);
+   view = glm::rotate(view, (GLfloat)glm::radians(phiCam), glm::vec3(-1.0, 0.0, 0.0));
+   view = glm::rotate(view, (GLfloat)glm::radians(thetaCam), glm::vec3(0.0, 1.0, 0.0));
+   glm::vec3 forward = glm::normalize(glm::vec3(view.x, 0.0, view.z));
+   glm::vec3 up = glm::vec3(0.0, 1.0, 0.0);
+   glm::vec3 right = glm::normalize(glm::cross(forward, up));
+   cameraPos += movementIncr * ((goF - goB) * forward + (goR - goL) * right + (goU - goD) * up);
+   matrVisu.LookAt( cameraPos, cameraPos + view, glm::vec3(0.0, 1.0, 0.0));
 
    glUniformMatrix4fv( locmatrVisuBase, 1, GL_FALSE, matrVisu );
 
@@ -876,15 +898,34 @@ void FenetreTP::redimensionner( GLsizei w, GLsizei h )
    delete [] index;
 }
 
-static void echoEtats( )
+
+/* Key up */
+void FenetreTP::clavierRelache( TP_touche touche)
 {
-   static std::string illuminationStr[] = { "0:Lambert", "1:Gouraud", "2:Phong" };
-   static std::string reflexionStr[] = { "0:Phong", "1:Blinn" };
-   static std::string spotStr[] = { "0:OpenGL", "1:Direct3D" };
-   std::cout << " modèle d'illumination= " << illuminationStr[varsUnif.typeIllumination]
-             << ", refléxion spéculaire= " << reflexionStr[varsUnif.utiliseBlinn]
-             << ", spot= " << spotStr[varsUnif.utiliseDirect]
-             << std::endl;
+    switch ( touche )
+    {
+        /* Mouvement camera */
+    case TP_z: /* Forward */
+        goF = 0;
+        break;
+    case TP_s: /* Backward */
+        goB = 0;
+        break;
+    case TP_q: /* Left */
+        goL = 0;
+        break;
+    case TP_d: /* Right */
+        goR = 0;
+        break;
+    case TP_ESPACE:
+        goU = 0;
+        break;
+    case TP_CONTROLEGAUCHE:
+        goD = 0;
+        break;
+    default:
+        break;
+    }
 }
 
 // fonction de gestion du clavier
@@ -894,8 +935,27 @@ void FenetreTP::clavier( TP_touche touche )
    switch ( touche )
    {
    case TP_ECHAP:
-   case TP_q: // Quitter l'application
       quit();
+      break;
+
+   /* Mouvement camera */
+   case TP_z: /* Forward */
+      goF = 1;
+      break;
+   case TP_s: /* Backward */
+      goB = 1;
+      break;
+   case TP_q: /* Left */
+      goL = 1;
+      break;
+   case TP_d: /* Right */
+      goR = 1;
+      break;
+   case TP_ESPACE: /* Up */
+      goU = 1;
+      break;
+   case TP_CONTROLEGAUCHE: /* Down */
+      goD = 1;
       break;
 
    case TP_x: // Activer/désactiver l'affichage des axes
@@ -908,120 +968,26 @@ void FenetreTP::clavier( TP_touche touche )
       std::cout << "// Recharger nuanceurs" << std::endl;
       break;
 
-   case TP_p: // Permuter la projection: perspective ou orthogonale
-      enPerspective = !enPerspective;
-      break;
-
-   case TP_i: // Alterner entre le modèle d'illumination: Lambert, Gouraud, Phong
-      if ( ++varsUnif.typeIllumination > 2 ) varsUnif.typeIllumination = 0;
-      echoEtats( );
-      break;
-
-   case TP_r: // Alterner entre le modèle de réflexion spéculaire: Phong, Blinn
-       // Send one wave front
+   case TP_r:
+       // Send one wave front "One ping only."
        packets->CreateCircularWavefront(0.0, 0.0, 2.0, 0.2, 1.0, 10000);
        printf("Sending a circular wavefront...\n");
       break;
 
-   case TP_s: // Alterner entre le modèle de spot: OpenGL, Direct3D
-      varsUnif.utiliseDirect = !varsUnif.utiliseDirect;
-      echoEtats( );
+   case TP_f:
+       // Send one wave front "One ping only."
+       packets->CreateLinearWavefront(0.0, 0.0, 1.0, 0.0, 2.0, 0.2, 1.0, 10000);
+       printf("Sending a linear wavefront...\n");
       break;
 
-   //case TP_l: // Alterner entre une caméra locale à la scène ou distante (localViewer)
-   //   LightModel.localViewer = !LightModel.localViewer;
-   //   std::cout << " localViewer=" << LightModel.localViewer << std::endl;
-   //   break;
-
-   case TP_a: // Incrémenter l'angle du cône du spot
-   case TP_EGAL:
-   case TP_PLUS:
-      LightSource[0].spotAngle += 2.0;
-      if ( LightSource[0].spotAngle > 90.0 ) LightSource[0].spotAngle = 90.0;
-      std::cout <<  " spotAngle=" << LightSource[0].spotAngle << std::endl;
-      break;
-   case TP_z: // Décrémenter l'angle du cône du spot
-   case TP_MOINS:
-   case TP_SOULIGNE:
-      LightSource[0].spotAngle -= 2.0;
-      if ( LightSource[0].spotAngle < 0.0 ) LightSource[0].spotAngle = 0.0;
-      std::cout <<  " spotAngle=" << LightSource[0].spotAngle << std::endl;
-      break;
-
-   case TP_d: // Incrémenter l'exposant du spot
-   case TP_BARREOBLIQUE:
-      LightSource[0].spotExposant += 0.3;
-      if ( LightSource[0].spotExposant > 89.0 ) LightSource[0].spotExposant = 89.0;
-      std::cout <<  " spotExposant=" << LightSource[0].spotExposant << std::endl;
-      break;
-   case TP_e: // Décrémenter l'exposant du spot
-   case TP_POINT:
-      LightSource[0].spotExposant -= 0.3;
-      if ( LightSource[0].spotExposant < 0.0 ) LightSource[0].spotExposant = 0.0;
-      std::cout <<  " spotExposant=" << LightSource[0].spotExposant << std::endl;
-      break;
-
-   case TP_j: // Incrémenter le coefficient de brillance
-   case TP_CROCHETDROIT:
-      FrontMaterial.shininess *= 1.1;
-      std::cout << " FrontMaterial.shininess=" << FrontMaterial.shininess << std::endl;
-      break;
-   case TP_u: // Décrémenter le coefficient de brillance
-   case TP_CROCHETGAUCHE:
-      FrontMaterial.shininess /= 1.1; if ( FrontMaterial.shininess < 0.0 ) FrontMaterial.shininess = 0.0;
-      std::cout << " FrontMaterial.shininess=" << FrontMaterial.shininess << std::endl;
-      break;
-
-   case TP_DROITE:
-      LightSource[0].position.x += 0.3;
-      break;
-   case TP_GAUCHE:
-      LightSource[0].position.x -= 0.3;
-      break;
-   case TP_BAS:
-      LightSource[0].position.y += 0.3;
-      break;
-   case TP_HAUT:
-      LightSource[0].position.y -= 0.3;
-      break;
-
-   case TP_FIN:
-      LightSource[0].spotDirection.x += 0.6;
-      break;
-   case TP_DEBUT:
-      LightSource[0].spotDirection.x -= 0.6;
-      break;
-   case TP_PAGEPREC:
-      LightSource[0].spotDirection.y += 0.6;
-      break;
-   case TP_PAGESUIV:
-      LightSource[0].spotDirection.y -= 0.6;
-      break;
-
-   case TP_m: // Choisir le modèle affiché: cube, tore, sphère, théière, cylindre, cône
-      if ( ++modele > 6 ) modele = 1;
-      std::cout << " modele=" << modele << std::endl;
+   case TP_a:
+       // Send one packet
+       packets->CreateSpreadingPacket(0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 0.2, 1.0, 10000);
+       printf("Sending a spreading packet...\n");
       break;
 
    case TP_0:
       thetaCam = 0.0; phiCam = 0.0; distCam = 30.0; // placer les choses afin d'avoir une belle vue
-      break;
-
-   case TP_t: // Choisir la texture utilisée: aucune, dé, échiquier
-      varsUnif.texnumero++;
-      if ( varsUnif.texnumero > 2 ) varsUnif.texnumero = 0;
-      std::cout << " varsUnif.texnumero=" << varsUnif.texnumero << std::endl;
-      break;
-
-   // case TP_c: // Changer l'affichage de l'objet texturé avec couleurs ou sans couleur
-   //    varsUnif.utiliseCouleur = !varsUnif.utiliseCouleur;
-   //    std::cout << " utiliseCouleur=" << varsUnif.utiliseCouleur << std::endl;
-   //    break;
-
-   case TP_o: // Changer l'affichage des texels noirs (noir, mi-coloré, transparent)
-      varsUnif.afficheTexelNoir++;
-      if ( varsUnif.afficheTexelNoir > 2 ) varsUnif.afficheTexelNoir = 0;
-      std::cout << " afficheTexelNoir=" << varsUnif.afficheTexelNoir << std::endl;
       break;
 
    case TP_g: // Permuter l'affichage en fil de fer ou plein
@@ -1029,11 +995,7 @@ void FenetreTP::clavier( TP_touche touche )
       glPolygonMode( GL_FRONT_AND_BACK, modePolygone );
       break;
 
-   case TP_n: // Utiliser ou non les normales calculées comme couleur (pour le débogage)
-      varsUnif.afficheNormales = !varsUnif.afficheNormales;
-      break;
-
-   case TP_ESPACE: // Permuter la rotation automatique du modèle
+   case TP_p: // Permuter la rotation automatique du modèle
       enmouvement = !enmouvement;
       break;
 
@@ -1096,8 +1058,8 @@ void FenetreTP::sourisMouvement( int x, int y )
       switch ( deplace )
       {
       case deplaceCam:
-         thetaCam -= dx / 3.0;
-         phiCam   -= dy / 3.0;
+         thetaCam -= dx / 9.0;
+         phiCam   -= dy / 9.0;
          break;
       case deplaceSpotDirection:
          LightSource[0].spotDirection.x += 0.06 * dx;

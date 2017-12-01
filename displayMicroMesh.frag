@@ -27,7 +27,7 @@ void main(void)
         N = vec3(0, -1, 0);
     else
         N = normalize(N);
-    vec3 V = normalize(In.pos - (matrVisu * matrModel)[3].xyz); /* TODO check view vector */
+    vec3 V = normalize(matrVisu * matrModel * vec4(In.pos, 1.0)).xyz; /* TODO check view vector */
     vec3 R = V - (2 * dot(V, N))*N; /* Reflection */
     /* Diffuse + reflective lighting */
     vec3 color = vec3(0.5, 0.6, 0.8);
