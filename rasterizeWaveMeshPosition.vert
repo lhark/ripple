@@ -7,8 +7,8 @@ uniform mat4 matrProj;
 
 /////////////////////////////////////////////////////////////////
 
-in vec2 Vertex;
-in vec2 TexCoord;
+layout(location=0) in vec2 Vertex;
+layout(location=1) in vec2 TexCoord;
 
 out Attribs {
     vec3 pos;
@@ -17,6 +17,7 @@ out Attribs {
 void main(void)
 {
     Out.pos = 0.5 * SCENE_EXTENT * vec3(Vertex.x, 0, Vertex.y);
+    /* Direct3D and OpenGL don't render with the same screen coordinates */
     gl_Position = matrProj * matrVisu * matrModel * vec4(Out.pos, 1.);
 }
 

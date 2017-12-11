@@ -118,6 +118,7 @@ double phiCam = 0.0;          // angle de rotation de la caméra (coord. sphéri
 double distCam = 0.0;         // distance (coord. sphériques)
 glm::vec3 cameraPos = glm::vec3(10.17, 22.13, 59.49);
 float movementIncr = 0.8;
+/* Movement direction */
 float goF = 0; /* Forward */
 float goR = 0; /* Right */
 float goB = 0; /* Back */
@@ -128,7 +129,7 @@ float goD = 0; /* Down */
 // variables d'état
 bool enPerspective = false;   // indique si on est en mode Perspective (true) ou Ortho (false)
 bool enmouvement = true;     // le modèle est en mouvement/rotation automatique ou non
-bool afficheAxes = true;      // indique si on affiche les axes
+bool afficheAxes = false;      // indique si on affiche les axes
 GLenum modePolygone = GL_FILL; // comment afficher les polygones
 
 // FBOs
@@ -194,8 +195,6 @@ void updatePackets()
     if (enmouvement)
         packets->AdvectWavePackets(INIT_WAVE_SPEED);
 
-    // TODO Setup wide projection for InitiateWaveField (RasterizeWaveMeshPosition)
-
     if (!debug)
         heightFBO->CommencerCapture();
     int displayedPackets = 0;
@@ -227,8 +226,6 @@ void updatePackets()
                 /* TODO Use Buffer mapping for better performance */
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
-                //displayPacketOutlined(packetChunk / 12);
-                /* TODO EvaluatePackets(packetChunk) */
                 addPacketDisplacement(displayedPackets);
                 displayedPackets = 0;
                 packetChunk = 0;
@@ -261,8 +258,6 @@ void updatePackets()
             glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
-            //displayPacketOutlined();
-            /* TODO EvaluatePackets(packetChunk) */
             addPacketDisplacement(displayedPackets);
             displayedPackets = 0;
             packetChunk = 0;
@@ -271,13 +266,9 @@ void updatePackets()
     glBindBuffer(GL_ARRAY_BUFFER, vboPacket);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(packetData), packetData);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    //displayPacketOutlined(packetChunk / 12);
-    /* TODO EvaluatePackets(packetChunk) */
     addPacketDisplacement(displayedPackets);
     if (!debug)
         heightFBO->TerminerCapture();
-    /* TODO DisplayScene */
-    /* TODO Get camera center */
 }
 
 
@@ -710,11 +701,6 @@ void afficherModele()
 {
    // Dessiner le modèle
    matrModel.PushMatrix(); {
-
-
-      // mise à l'échelle
-      matrModel.Scale( 5.0, 5.0, 5.0 );
-
       /* Create texture terrain positions */
       posFBO->CommencerCapture();
       rasterizeWaveMeshPosition();
@@ -768,7 +754,6 @@ void FenetreTP::afficherScene()
 void FenetreTP::redimensionner( GLsizei w, GLsizei h )
 {
    std::cout << "Resizing to " << w << "×" << h << std::endl;
-   /* FIXME Is this function called on program start ? */
    glViewport( 0, 0, w, h );
    posFBO->Liberer();
    posFBO->Init(WAVETEX_WIDTH_FACTOR * w, WAVETEX_HEIGHT_FACTOR * h);

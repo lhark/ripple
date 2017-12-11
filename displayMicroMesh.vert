@@ -22,14 +22,12 @@ out Attribs {
 void main(void)
 {
     Out.texuv = Vertex;
-    /* TODO setup Linear sampler */
-    vec4 pos = texture(waterPos, Vertex);
+    vec4 pos = texture(waterPos, Out.texuv);
     if (pos.w <= 0.0) { /* No position data -> no water here */
         Out.pos = vec3(0);
         gl_Position = vec4(0,0,0,-1);
     } else {
-        /* TODO setup Linear sampler */
-        Out.pos = pos.xyz + texture(waterHeight, Vertex).rgb;
+        Out.pos = pos.xyz + texture(waterHeight, Out.texuv).rgb;
         gl_Position = matrProj * matrVisu * matrModel * vec4(Out.pos, 1);
     }
 }

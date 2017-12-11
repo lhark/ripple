@@ -19,7 +19,8 @@ out Attribs {
 
 void main(void)
 {
-    Out.Pos = Pos;
+    /* The coordinate inversion compensate for Direct3D flipped drawing coordinates */
+    Out.Pos = Pos * vec4(1,-1,1,-1);
     Out.Att1 = Att1;
     Out.Att2 = Att2;
     gl_PointSize = 5;
